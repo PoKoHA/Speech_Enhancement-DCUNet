@@ -50,5 +50,5 @@ COde: https://github.com/chanil1218/DCUnet.pytorch
 > `python main.py -e(or --evaluate) --resume (PATH) --noisy-test-dir (PATH) --clean-test-dir (PATH)`
 
 **Generate**
-> 'python main.py -g(or --generate) --resume (PATH) --denoising-file (file)'
+> `python main.py -g(or --generate) --resume (PATH) --denoising-file (file)`
 
