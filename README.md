@@ -43,6 +43,12 @@ COde: https://github.com/chanil1218/DCUnet.pytorch
 
 **Training**
 
->`python main.py --epochs 100 --gpu 0 --batch-size 4
+> `python main.py --epochs 100 --gpu 0 --batch-size 4
 --clean-train-dir 'PATH' --noisy-train-dir 'PATH' --noisy-valid-dir 'PATH --clean-valid-dir 'PATH --sample-rate (DATA)`
+
+**Evaluate**
+> `python main.py -e(or --evaluate) --resume (PATH) --noisy-test-dir (PATH) --clean-test-dir (PATH)`
+
+**Generate**
+> 'python main.py -g(or --generate) --resume (PATH) --denoising-file (file)'
 
