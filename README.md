@@ -1,8 +1,7 @@
-학습이 제대로 이루어지지 않고 있음 
+~~TODO~~
 
-TODO
+~~- 코드의 수정이 필요함~~(2021/08/06 수정완료)
 
-- 코드의 수정이 필요함
 
 > 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여
 > 좋은 결과를 만들어냄
@@ -34,6 +33,16 @@ Unet: https://arxiv.org/abs/1505.04597
 Phase: https://angeloyeo.github.io/2019/10/11/Fourier_Phase.html
 (Phase와 Magnitude 지식 필요)
 
+**Code: https://github.com/pheepa/DCUnet/blob/master/dcunet.ipynb**
+
 Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch
 
 COde: https://github.com/chanil1218/DCUnet.pytorch
+
+## Implement
+
+**Training**
+
+>`python main.py --epochs 100 --gpu 0 --batch-size 4
+--clean-train-dir 'PATH' --noisy-train-dir 'PATH' --noisy-valid-dir 'PATH --clean-valid-dir 'PATH --sample-rate (DATA)`
+
