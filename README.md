@@ -37,7 +37,9 @@ Phase: https://angeloyeo.github.io/2019/10/11/Fourier_Phase.html
 
 Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch
 
-COde: https://github.com/chanil1218/DCUnet.pytorch
+Code: https://github.com/chanil1218/DCUnet.pytorch
+
+Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19fa366f1da84eff8c0c25ff88a
 
 ## Implement
 

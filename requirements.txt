@@ -1,0 +1,25 @@
+certifi==2021.5.30
+cffi @ file:///tmp/build/80754af9/cffi_1625814693874/work
+cycler==0.10.0
+dataclasses==0.8
+future==0.18.2
+kiwisolver @ file:///tmp/build/80754af9/kiwisolver_1612282412546/work
+matplotlib @ file:///tmp/build/80754af9/matplotlib-suite_1613407855456/work
+mkl-fft==1.3.0
+mkl-random==1.1.1
+mkl-service==2.3.0
+numpy @ file:///tmp/build/80754af9/numpy_and_numpy_base_1603487797006/work
+olefile==0.46
+Pillow @ file:///tmp/build/80754af9/pillow_1625649052827/work
+pycparser @ file:///tmp/build/80754af9/pycparser_1594388511720/work
+pyparsing @ file:///home/linux1/recipes/ci/pyparsing_1610983426697/work
+pypesq==1.2.4
+python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
+six @ file:///tmp/build/80754af9/six_1623709665295/work
+SoundFile==0.10.3.post1
+torch==1.7.0
+torchaudio==0.7.0
+torchvision==0.4.0a0+6b959ee
+tornado @ file:///tmp/build/80754af9/tornado_1606942266872/work
+tqdm @ file:///tmp/build/80754af9/tqdm_1627710282869/work
+typing-extensions==3.10.0.0

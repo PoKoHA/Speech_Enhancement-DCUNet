@@ -3,26 +3,28 @@ import torch.nn as nn
 
 class CConv2d(nn.Module):
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0):
+    def __init__(self, in_channel, out_channel, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, **kwargs):
         super(CConv2d, self).__init__()
 
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.padding = padding
-        self.stride = stride
+        self.real_conv = nn.Conv2d(in_channels=in_channel,
+                                   out_channels=out_channel,
+                                   kernel_size=kernel_size,
+                                   stride=stride,
+                                   padding=padding,
+                                   dilation=dilation,
+                                   groups=groups,
+                                   bias=bias,
+                                   **kwargs)
 
-        self.real_conv = nn.Conv2d(in_channels=self.in_channels,
-                                   out_channels=self.out_channels,
-                                   kernel_size=self.kernel_size,
-                                   padding=self.padding,
-                                   stride=self.stride)
-
-        self.imag_conv = nn.Conv2d(in_channels=self.in_channels,
-                                 out_channels=self.out_channels,
-                                 kernel_size=self.kernel_size,
-                                 padding=self.padding,
-                                 stride=self.stride)
+        self.imag_conv = nn.Conv2d(in_channels=in_channel,
+                                   out_channels=out_channel,
+                                   kernel_size=kernel_size,
+                                   stride=stride,
+                                   padding=padding,
+                                   dilation=dilation,
+                                   groups=groups,
+                                   bias=bias,
+                                   **kwargs)
 
         nn.init.xavier_uniform_(self.real_conv.weight)
         nn.init.xavier_uniform_(self.imag_conv.weight)
@@ -40,29 +42,28 @@ class CConv2d(nn.Module):
 
 class CConvTranspose2d(nn.Module):
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride, output_padding=0, padding=0):
+    def __init__(self, in_channel, out_channel, kernel_size, stride=1, padding=0, output_padding=0, dilation=1, groups=1, bias=True, **kwargs):
         super(CConvTranspose2d, self).__init__()
 
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.output_padding = output_padding
-        self.padding = padding
-        self.stride = stride
+        self.real_Transconv = nn.ConvTranspose2d(in_channel, out_channel,
+                                                 kernel_size=kernel_size,
+                                                 stride=stride,
+                                                 padding=padding,
+                                                 output_padding=output_padding,
+                                                 groups=groups,
+                                                 bias=bias,
+                                                 dilation=dilation,
+                                                 **kwargs)
 
-        self.real_Transconv = nn.ConvTranspose2d(in_channels=self.in_channels,
-                                             out_channels=self.out_channels,
-                                             kernel_size=self.kernel_size,
-                                             output_padding=self.output_padding,
-                                             padding=self.padding,
-                                             stride=self.stride)
-
-        self.imag_Transconv = nn.ConvTranspose2d(in_channels=self.in_channels,
-                                           out_channels=self.out_channels,
-                                           kernel_size=self.kernel_size,
-                                           output_padding=self.output_padding,
-                                           padding=self.padding,
-                                           stride=self.stride)
+        self.imag_Transconv = nn.ConvTranspose2d(in_channel, out_channel,
+                                                 kernel_size=kernel_size,
+                                                 stride=stride,
+                                                 padding=padding,
+                                                 output_padding=output_padding,
+                                                 groups=groups,
+                                                 bias=bias,
+                                                 dilation=dilation,
+                                                 **kwargs)
 
         # Glorot initialization.
         nn.init.xavier_uniform_(self.real_Transconv.weight)

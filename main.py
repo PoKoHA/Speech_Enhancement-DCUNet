@@ -7,6 +7,7 @@ import time
 import datetime
 from pathlib import Path
 from tqdm import tqdm
+from collections import OrderedDict
 
 import torch
 import torch.nn as nn
@@ -16,10 +17,13 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data
 
 from data.dataset import SpeechDataset
-from model.DCUNet import DCUNet
+from model.DCUNet import *
 from losses import wSDR
 from metrics import pesq_score
 from utils import generate_wav
+from data.STFT import STFT
+
+warnings.filterwarnings(action='ignore')
 
 parser = argparse.ArgumentParser()
 
@@ -28,6 +32,7 @@ parser.add_argument('--start-epoch', type=int, default=0)
 parser.add_argument('--num-workers', type=int, default=4, help='Number of workers in dataset loader (default: 4)')
 parser.add_argument('--batch-size', type=int, default=32, help='Batch size in training (default: 32)')
 parser.add_argument('--lr', default=1e-4)
+parser.add_argument('--arch', type=str, default="DCUnet10")
 
 parser.add_argument('--clean-train-dir', type=str, default="dataset/clean_trainset_28spk_wav")
 parser.add_argument('--noisy-train-dir', type=str, default="dataset/noisy_trainset_28spk_wav")
@@ -82,7 +87,12 @@ def main_worker(gpu, ngpus_per_node, args):
         print("Use GPU: {} for training".format(args.gpu))
 
     # Model
-    model = DCUNet(n_fft=N_FFT, hop_length=HOP_LENGTH)
+    if args.arch == 'DCUnet10':
+        model = DCUNet10(args=args, n_fft=N_FFT, hop_length=HOP_LENGTH)
+        print("DCUNET10")
+    else:
+        model = DCUNet16(args=args, n_fft=N_FFT, hop_length=HOP_LENGTH)
+        print("DCUNET16")
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -101,7 +111,18 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Resume
     if args.resume:
-        model.load_state_dict(torch.load(args.resume))
+        model.load_state_dict(torch.load(args.resume, map_location="cuda:0"))
+
+        # 만약 Dataparallel 으로 저장했을 시 이 코드 사용
+        # stat_dict = torch.load(args.resume, map_location="cuda:0")
+        #
+        # new_state_dict = OrderedDict()
+        # for k, v in stat_dict.items():
+        #     name = k[7:] # remove 'module'
+        #     new_state_dict[name] = v
+        #
+        # model.load_state_dict(new_state_dict)
+
 
     # Dataset path
     mixed_train_dir = Path(args.noisy_train_dir)
@@ -139,6 +160,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # generate wav file
     if args.generate:
         generate_wav(model, args.denoising_file, args.max_len, N_FFT, HOP_LENGTH, args)
+        print("Generate Denoising File")
         return
 
     # Evaluate
@@ -151,18 +173,19 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Train
     best_PESQ = -1e10
+
     for epoch in range(args.start_epoch, args.epochs):
         train(train_loader, model, criterion, optimizer, scheduler, epoch, N_FFT, HOP_LENGTH, args)
-
         print("--validate--")
         PESQ, loss = validate(valid_loader, model, criterion, N_FFT, HOP_LENGTH, args)
+
         print(f"--Epoch[{epoch}] | loss: {loss:.4f} | PESQ: {PESQ:.4f}".format(
-            epoch=epoch, loss=loss, PESQ=PESQ
+            epoch=epoch + 1, loss=loss, PESQ=PESQ
         ))
 
         if best_PESQ < PESQ: # 현재 PESQ 더 클시
             print("Found better validated model")
-            torch.save(model.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
+            torch.save(model.module.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
             best_PESQ = PESQ
 
 
@@ -172,11 +195,14 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
     end = time.time()
     # Dataset return x_noisy_stft, x_clean_stft
     for i, (mixed, target) in enumerate(train_loader):
-        mixed = mixed.cuda(args.gpu, non_blocking=True) # noisy
-        target = target.cuda(args.gpu, non_blocking=True) # Clean
+        mixed = mixed.cuda(args.gpu) # noisy
+        target = target.cuda(args.gpu)# Clean
 
         pred = model(mixed) # denoisy
-        loss = criterion(n_fft, hop_length, mixed, pred, target)
+        # print("mixed", mixed.size())
+        # print("pred", pred.size())
+        # print("target", target.size())
+        loss = criterion(args, n_fft, hop_length, mixed, pred, target)
 
         optimizer.zero_grad()
         loss.backward()
@@ -193,7 +219,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
 def validate(dataloader, model, criterion, n_fft, hop_length, args):
     model.eval()
     # loss와 score를 동시에 구하는 함수로 대체하였음
-    score, loss_avg = pesq_score(model, dataloader, criterion,args, n_fft, hop_length)
+    score, loss_avg = pesq_score(model, dataloader, criterion, args, n_fft, hop_length)
 
     return score, loss_avg
 

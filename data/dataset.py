@@ -1,14 +1,21 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 import torchaudio
 from torch.utils.data import Dataset
+
+from data.STFT import STFT
 
 class SpeechDataset(Dataset):
 
     def __init__(self, args, noisy_files, clean_files, max_len, n_fft=64, hop_length=16):
         super(SpeechDataset, self).__init__()
         self.args = args
+
+        # STFT
+        self.stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True)
+        # default 로 window 는 hanning 이고 length 는 n_fft와 동일하게
 
         # list of files
         self.noisy_files = sorted(noisy_files)
@@ -50,9 +57,18 @@ class SpeechDataset(Dataset):
         x_noisy = self._prepare_sample(x_noisy)
 
         # STFT
-        x_noisy_stft = torch.stft(input=x_noisy, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
-        x_clean_stft = torch.stft(input=x_clean, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
+        x_noisy_stft = self.stft(x_noisy)
+        x_clean_stft = self.stft(x_clean)
 
+        # real = x_noisy_stft[:, :, :, 0]
+        # imag = x_noisy_stft[:, :, :, 1]
+
+        # mag = torch.abs(real)
+        # plt.figure(figsize=(15, 10))
+        # plt.pcolormesh(mag[0])
+        # plt.colorbar(format="%+2.f dB")
+        # plt.title(self.noisy_files[idx])
+        # plt.show()
         # print("A: ", x_noisy_stft.size())
         # print("B: ", x_clean_stft.size())
 
