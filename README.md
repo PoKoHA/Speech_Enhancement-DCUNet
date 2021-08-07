@@ -54,3 +54,8 @@ Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19f
 **Generate**
 > `python main.py -g(or --generate) --resume (PATH) --denoising-file (file)`
 
+## Result
+
+| Mix | predict | GT |
+|---|---|---|
+| [mixture.wav](./example/mixed.wav?raw=true) |  [predict.wav](./example/predict.wav?raw=true)  |  [GT.wav](./example/GT.wav?raw=true)  |
