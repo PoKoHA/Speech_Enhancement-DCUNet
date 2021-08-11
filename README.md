@@ -59,3 +59,16 @@ Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19f
 | Mix | predict | GT |
 |---|---|---|
 | [mixture.wav](./example/mixed.wav?raw=true) |  [predict.wav](./example/predict.wav?raw=true)  |  [GT.wav](./example/GT.wav?raw=true)  |
+
+## Test
+
+LAS model 기반으로 Clovacall Dataset ASR
+
+**CER(Character Error Rate)**
+
+| Clean | Mixed | Denoising |
+|---|---|---|
+|**21%**|**106%**|**39%**|
+
+- 106%: Predict Length가 Target Length보다 작을 경우(e.g Target: 안녕하세요 / Predict: 그래)
+- 약 **70%** 감소 시키는 효과를 보였음
