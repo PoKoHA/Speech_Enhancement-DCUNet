@@ -1,8 +1,19 @@
+"""
+complex-valued convolutional filter W = A+iB
+complex vector h = x + iy
+
+W ∗h = (A ∗ x − B ∗ y) + i(B ∗ x+ A ∗ y)
+"""
+import matplotlib.pyplot as plt
+import librosa
+
 import torch
 import torch.nn as nn
 
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
+
+from utils import display_feature
 
 class EncoderBlock(nn.Module):
 
@@ -41,9 +52,28 @@ class DecoderBlock(nn.Module):
         Trans_cConv = self.Trans_cConv(x)
         # Paper) last_decoder_layer 에서는 BN과 Activation 을 사용하지 않음
         if self.last:
+            # display_feature(Trans_cConv[..., 0], "Decoder_8_real")
+            # display_feature(Trans_cConv[..., 1], "Decoder_8_imag")
             mask_phase = Trans_cConv / (torch.abs(Trans_cConv) + 1e-8)
+            # print("mask_ph: ", mask_phase[0])
             mask_mag = torch.tanh(torch.abs(Trans_cConv))
-            output = mask_phase * mask_mag
+            # print("mask_mag: ", mask_mag[0])
+            output = mask_phase * mask_mag # [batch, channel, 1539, 214, 2 ]
+            real = output[..., 0]
+            imag = output[..., 1]
+            mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
+            phase = torch.atan2(imag, real)
+
+            real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
+            imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
+            phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
+            mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
+
+            #display_spectrogram(real_db, "mask_Real")
+            #display_spectrogram(imag_db, "mask_Imag")
+            #display_spectrogram(mag_db, "mask_mag")
+            #display_spectrogram(phase_db, "mask_phase")
+
         else:
             normed = self.cBN(Trans_cConv)
             output = self.leaky_relu(normed)
@@ -79,7 +109,7 @@ class DCUNet10(nn.Module):
 
     def forward(self, x, is_istft=True):
         # downsampling/encoding
-        # print("input: ", x.size())
+        # # print("input: ", x.size())
         d0 = self.downsample0(x)
         d1 = self.downsample1(d0)
         d2 = self.downsample2(d1)
@@ -90,29 +120,29 @@ class DCUNet10(nn.Module):
         u0 = self.upsample0(d4)
 
         # skip-connection
-        # print("d3: ", d3.size())
-        # print("u0: ", u0.size())
+        # # print("d3: ", d3.size())
+        # # print("u0: ", u0.size())
         c0 = torch.cat((u0, d3), dim=1)
 
         u1 = self.upsample1(c0)
-        # print("d2: ", d2.size())
-        # print("u1: ", u1.size())
+        # # print("d2: ", d2.size())
+        # # print("u1: ", u1.size())
         c1 = torch.cat((u1, d2), dim=1)
 
         u2 = self.upsample2(c1)
-        # print("d1: ", d1.size())
-        # print("u2: ", u2.size())
+        # # print("d1: ", d1.size())
+        # # print("u2: ", u2.size())
         c2 = torch.cat((u2, d1), dim=1)
 
         u3 = self.upsample3(c2)
-        # print("d0: ", d0.size())
-        # print("u3: ", u3.size())
+        # # print("d0: ", d0.size())
+        # # print("u3: ", u3.size())
         c3 = torch.cat((u3, d0), dim=1)
 
         u4 = self.upsample4(c3)
 
-        # print("x: ", x.size())
-        # print("mask_hat: ", mask_hat.size())
+        # # print("x: ", x.size())
+        # # print("mask_hat: ", mask_hat.size())
 
         output = x * u4
         if is_istft:
@@ -156,56 +186,137 @@ class DCUNet16(nn.Module):
 
     def forward(self, x, is_istft=True):
         # downsampling/encoding
-        # print("input: ", x.size())
+        # print("   --[Encoder]-- ")
+        # print("       Input(spec): ", x.size())
+        # display_feature(x[..., 0], "input_real")
+        # display_feature(x[..., 1], "input_imag")
         d0 = self.downsample0(x)
+        # display_feature(d0[..., 0], "Encoder_1_real")
+        # display_feature(d0[..., 1], "Encoder_1_imag")
+        # print("   d0: ", d0.size())
         d1 = self.downsample1(d0)
+        # display_feature(d1[..., 0], "Encoder_2_real")
+        # display_feature(d1[..., 1], "Encoder_2_imag")
+        # print("   d1: ", d1.size())
         d2 = self.downsample2(d1)
+        # display_feature(d2[..., 0], "Encoder_3_real")
+        # display_feature(d2[..., 1], "Encoder_3_imag")
+        # print("   d2: ", d2.size())
         d3 = self.downsample3(d2)
+        # display_feature(d3[..., 0], "Encoder_4_real")
+        # display_feature(d3[..., 1], "Encoder_4_imag")
+        # print("   d3: ", d3.size())
         d4 = self.downsample4(d3)
+        # display_feature(d4[..., 0], "Encoder_5_real")
+        # display_feature(d4[..., 1], "Encoder_5_imag")
+        # print("   d4: ", d4.size())
         d5 = self.downsample5(d4)
+        # display_feature(d5[..., 0], "Encoder_6_real")
+        # display_feature(d5[..., 1], "Encoder_6_imag")
+        # print("   d5: ", d5.size())
         d6 = self.downsample6(d5)
+        # display_feature(d6[..., 0], "Encoder_7_real")
+        # display_feature(d6[..., 1], "Encoder_7_imag")
+        # print("   d6: ", d6.size())
         d7 = self.downsample7(d6)
+        # display_feature(d7[..., 0], "Encoder_8_real")
+        # display_feature(d7[..., 1], "Encoder_8_imag")
+        # print("   d7: ", d7.size())
 
+        # print("   --[Decoder]-- ")
         # bridge 첫번째 Decoder에 skip connection X
         u0 = self.upsample0(d7)
+        # display_feature(u0[..., 0], "Decoder_1_real")
+        # display_feature(u0[..., 1], "Decoder_1_imag")
 
         # skip-connection
-        # print("d3: ", d3.size())
-        # print("u0: ", u0.size())
         c0 = torch.cat((u0, d6), dim=1)
+        # print("   u0: ", u0.size())
+        # print("   concat(u0,d6): ", c0.size())
 
         u1 = self.upsample1(c0)
-        # print("d2: ", d2.size())
-        # print("u1: ", u1.size())
+        # display_feature(u1[..., 0], "Decoder_2_real")
+        # display_feature(u1[..., 1], "Decoder_2_imag")
         c1 = torch.cat((u1, d5), dim=1)
+        # print("   u1: ", u1.size())
+        # print("   concat(u1,d5): ", c1.size())
 
         u2 = self.upsample2(c1)
-        # print("d1: ", d1.size())
-        # print("u2: ", u2.size())
+        # display_feature(u2[..., 0], "Decoder_3_real")
+        # display_feature(u2[..., 1], "Decoder_3_imag")
         c2 = torch.cat((u2, d4), dim=1)
+        # print("   u2: ", u2.size())
+        # print("   concat(u2,d4): ", c2.size())
 
         u3 = self.upsample3(c2)
+        # display_feature(u3[..., 0], "Decoder_4_real")
+        # display_feature(u3[..., 1], "Decoder_4_imag")
         c3 = torch.cat((u3, d3), dim=1)
+        # print("   u3: ", u3.size())
+        # print("   concat(u3,d3): ", c3.size())
 
         u4 = self.upsample4(c3)
-
+        # display_feature(u4[..., 0], "Decoder_5_real")
+        # display_feature(u4[..., 1], "Decoder_5_imag")
         c4 = torch.cat((u4, d2), dim=1)
+        # print("   u4: ", u4.size())
+        # print("   concat(u4,d2): ", c4.size())
 
         u5 = self.upsample5(c4)
-
+        # display_feature(u5[..., 0], "Decoder_6_real")
+        # display_feature(u5[..., 1], "Decoder_6_imag")
         c5 = torch.cat((u5, d1), dim=1)
+        # print("   u5: ", u5.size())
+        # print("   concat(u5,d1): ", c5.size())
 
         u6 = self.upsample6(c5)
-
+        # display_feature(u6[..., 0], "Decoder_7_real")
+        # display_feature(u6[..., 1], "Decoder_7_imag")
         c6 = torch.cat((u6, d0), dim=1)
+        # print("   u6: ", u6.size())
+        # print("   concat(u6,d0): ", c6.size())
 
         u7 = self.upsample7(c6)
+        # print("   u7: ", u7.size())
+
         output = x * u7
 
+        # print("x", x)
+        real = output[..., 0]
+        imag = output[..., 1]
+        # print(real.size())
+        mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
+        phase = torch.atan2(imag, real)
+
+        real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
+        imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
+        phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
+        mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
+
+        #display_spectrogram(real_db, "denoising_real")
+        #display_spectrogram(imag_db, "denoising_Imag")
+        #display_spectrogram(mag_db, "denoising_mag")
+        #display_spectrogram(phase_db, "denoising_phase")
+        # print("\n", "  Apply Mask(input * u7): ", output.size())
         if is_istft:
             # output = torch.squeeze(output, 1)
             # output = torch.istft(output, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
             output = self.istft(output)
+            # print("   istft: ", output.size())
             output = torch.squeeze(output, 1)
+            # print("   reshape: ", output.size())
+            # plt.figure(figsize=(15, 5))
+            # plt.plot(output.squeeze(0).cpu().detach().numpy())
+            # plt.title("denoising")
+            # plt.show()
 
         return output
+
+
+def display_spectrogram(x, title):
+    plt.figure(figsize=(15, 10))
+    plt.pcolormesh(x[0][0], cmap='hot') # 여기서는 Batch shape가 추가
+    plt.colorbar(format="%+2.f dB")
+    plt.title(title)
+    plt.show()
+

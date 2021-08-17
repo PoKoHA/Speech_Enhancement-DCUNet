@@ -18,9 +18,9 @@ import torch.utils.data
 
 from data.dataset import SpeechDataset
 from model.DCUNet import *
-from losses import wSDR
-from metrics import pesq_score
-from utils import generate_wav
+from utils.losses import wSDR
+from utils.metrics import pesq_score
+from utils.utils import generate_wav
 from data.STFT import STFT
 
 warnings.filterwarnings(action='ignore')
@@ -34,10 +34,10 @@ parser.add_argument('--batch-size', type=int, default=32, help='Batch size in tr
 parser.add_argument('--lr', default=1e-4)
 parser.add_argument('--arch', type=str, default="DCUnet10")
 
-parser.add_argument('--clean-train-dir', type=str, default="dataset/clean_trainset_28spk_wav")
-parser.add_argument('--noisy-train-dir', type=str, default="dataset/noisy_trainset_28spk_wav")
-parser.add_argument('--clean-valid-dir', type=str, default="dataset/clean_validset_28spk_wav")
-parser.add_argument('--noisy-valid-dir', type=str, default="dataset/noisy_validset_28spk_wav")
+parser.add_argument('--clean-train-dir', type=str, default="dataset/56spk/clean_trainset_56spk_wav")
+parser.add_argument('--noisy-train-dir', type=str, default="dataset/56spk/noisy_trainset_56spk_wav")
+parser.add_argument('--clean-valid-dir', type=str, default="dataset/56spk/clean_validset_56spk_wav")
+parser.add_argument('--noisy-valid-dir', type=str, default="dataset/56spk/noisy_validset_56spk_wav")
 parser.add_argument('--clean-test-dir', type=str, default="dataset/clean_testset_wav")
 parser.add_argument('--noisy-test-dir', type=str, default="dataset/noisy_testset_wav")
 
@@ -81,7 +81,11 @@ def main_worker(gpu, ngpus_per_node, args):
     # STFT 인자
     sampling_rate = args.sample_rate
     N_FFT = sampling_rate * 64 // 1000 + 4
+    # N_FFT = int(.02 * args.sample_rate)
+
     HOP_LENGTH = sampling_rate * 16 // 1000 + 4
+    # HOP_LENGTH = int(.01 * args.sample_rate)
+    # print(HOP_LENGTH)
 
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
@@ -123,6 +127,11 @@ def main_worker(gpu, ngpus_per_node, args):
         #
         # model.load_state_dict(new_state_dict)
 
+    # generate wav file
+    if args.generate:
+        generate_wav(model, args.denoising_file, args.max_len, N_FFT, HOP_LENGTH, args)
+        print("Generate Denoising File")
+        return
 
     # Dataset path
     mixed_train_dir = Path(args.noisy_train_dir)
@@ -157,12 +166,6 @@ def main_worker(gpu, ngpus_per_node, args):
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False,
                                               num_workers=args.num_workers, pin_memory=True)
 
-    # generate wav file
-    if args.generate:
-        generate_wav(model, args.denoising_file, args.max_len, N_FFT, HOP_LENGTH, args)
-        print("Generate Denoising File")
-        return
-
     # Evaluate
     if args.evaluate:
         PESQ, loss = validate(test_loader, model, criterion, N_FFT, HOP_LENGTH, args)
@@ -179,13 +182,13 @@ def main_worker(gpu, ngpus_per_node, args):
         print("--validate--")
         PESQ, loss = validate(valid_loader, model, criterion, N_FFT, HOP_LENGTH, args)
 
-        print(f"--Epoch[{epoch}] | loss: {loss:.4f} | PESQ: {PESQ:.4f}".format(
-            epoch=epoch + 1, loss=loss, PESQ=PESQ
+        print(f"loss: {loss:.4f} | PESQ: {PESQ:.4f}".format(
+            loss=loss, PESQ=PESQ
         ))
 
         if best_PESQ < PESQ: # 현재 PESQ 더 클시
             print("Found better validated model")
-            torch.save(model.module.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
+            torch.save(model.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
             best_PESQ = PESQ
 
 

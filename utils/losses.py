@@ -7,14 +7,22 @@ def wSDR(args, n_fft, hop_length, mixed, y_pred, y_GT, eps=1e-8):
 
     time_y_GT = isft(y_GT)
     time_mixed = isft(mixed)
+    # print("time_y_GT: ", time_y_GT.size())
+    # print("time_y_mixed: ", time_mixed.size())
 
     time_y_GT = torch.squeeze(time_y_GT, 1)
     time_mixed = torch.squeeze(time_mixed, 1)
+    # print("reshape: ", time_y_GT.size())
+    # print("reshape: ", time_mixed.size())
 
 
-    time_y_pred = y_pred.flatten(1)
+    time_y_pred = y_pred.flatten(1) # size는 변함없음
     time_y_GT = time_y_GT.flatten(1)
     time_mixed = time_mixed.flatten(1)
+    # print("A: ", time_y_GT.size())
+    # print("B: ", time_mixed.size())
+    # print("c: ", time_y_pred.size())
+
 
     def SDR(GT, pred, eps=1e-8):
         num = torch.sum(GT * pred, dim=1)

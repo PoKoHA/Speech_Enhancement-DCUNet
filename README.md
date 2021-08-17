@@ -56,6 +56,8 @@ Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19f
 
 ## Result
 
+- **PESQ: 3.1231 기록**
+
 | Mix | predict | GT |
 |---|---|---|
 | [mixture.wav](./example/mixed.wav?raw=true) |  [predict.wav](./example/predict.wav?raw=true)  |  [GT.wav](./example/GT.wav?raw=true)  |
