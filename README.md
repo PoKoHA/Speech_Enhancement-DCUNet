@@ -1,7 +1,8 @@
 ~~TODO~~
 
-~~- 코드의 수정이 필요함~~(2021/08/06 수정완료)
+~~- 코드의 수정이 필요함~~(2021/08/06 수정완료)~~
 
+- Result folder에 Spectrogram 비교 첨부 
 
 > 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여
 > 좋은 결과를 만들어냄
