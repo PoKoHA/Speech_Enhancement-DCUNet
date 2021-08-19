@@ -48,6 +48,10 @@ parser.add_argument('--print-freq', type=int, default=1)
 parser.add_argument('--seed', type=int, default=None, help='random seed (default: None)')
 parser.add_argument('--resume', default=None, type=str, metavar='PATH', help="model_args.resume")
 parser.add_argument('--evaluate', '-e', default=False, action='store_true')
+parser.add_argument('--hidden_dim', type=int, default=512)
+parser.add_argument('--n_head', type=int, default=3)
+parser.add_argument('--dropout', default=0.1, type=float)
+
 # generate
 parser.add_argument('--generate', '-g', default=False, action='store_true')
 parser.add_argument('--denoising-file', type=str, help="denoising 하고 싶은 파일경로")
@@ -201,7 +205,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         mixed = mixed.cuda(args.gpu) # noisy
         target = target.cuda(args.gpu)# Clean
 
-        pred = model(mixed) # denoisy
+        pred = model(mixed, target=target) # denoisy
         # print("mixed", mixed.size())
         # print("pred", pred.size())
         # print("target", target.size())

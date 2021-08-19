@@ -1,6 +1,6 @@
-~~TODO~~
+**TEST_01 Branch 에서는 Mask에 MultiHeadSelfAttention 해주고
+Teacher_forcing처럼 Target MultiHeadSelfAttention --> Mask output과 MultiHeadCrossAttention**
 
-~~- 코드의 수정이 필요함~~(2021/08/06 수정완료)~~
 
 - Result folder에 Spectrogram 비교 첨부 
 

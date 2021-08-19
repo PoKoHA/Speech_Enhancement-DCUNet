@@ -54,10 +54,10 @@ class SpeechDataset(Dataset):
         return output
 
     def __getitem__(self, idx):
-        # x_clean = self.load_sample(self.clean_files[idx])
-        x_clean = self.load_sample("test/10_GT.wav")
-        # x_noisy = self.load_sample(self.noisy_files[idx])
-        x_noisy = self.load_sample("test/10.wav")
+        x_clean = self.load_sample(self.clean_files[idx])
+        # x_clean = self.load_sample("test/10_GT.wav")
+        x_noisy = self.load_sample(self.noisy_files[idx])
+        # x_noisy = self.load_sample("test/10.wav")
 
         # print(self.clean_files[idx], x_clean.size())
         # print(self.noisy_files[idx], x_noisy.size())
@@ -70,6 +70,7 @@ class SpeechDataset(Dataset):
         # padding / cutting
         x_clean = self._prepare_sample(x_clean)
         x_noisy = self._prepare_sample(x_noisy)
+
         # plt.figure(figsize=(15, 5))
         # plt.plot(x_clean.squeeze(0).cpu().numpy())
         # plt.title(self.clean_files[idx])
@@ -79,7 +80,7 @@ class SpeechDataset(Dataset):
         # STFT
         x_noisy_stft = self.stft(x_noisy)
         x_clean_stft = self.stft(x_clean)
-        # print("target: ", x_clean_stft)
+        # print("target: ", x_clean_stft.size())
         # print("noisy: ", x_noisy_stft)
 
         real = x_noisy_stft[:, :, :, 0]

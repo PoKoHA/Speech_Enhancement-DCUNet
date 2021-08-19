@@ -13,7 +13,8 @@ import torch.nn as nn
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
 
-from utils import display_feature
+from utils.utils import display_feature
+from model.attention import *
 
 class EncoderBlock(nn.Module):
 
@@ -47,6 +48,7 @@ class DecoderBlock(nn.Module):
         self.cBN = CBatchNorm2d(num_features=out_channels)
         self.leaky_relu = nn.LeakyReLU(inplace=True, negative_slope=0.1)
 
+
     def forward(self, x):
 
         Trans_cConv = self.Trans_cConv(x)
@@ -54,20 +56,21 @@ class DecoderBlock(nn.Module):
         if self.last:
             # display_feature(Trans_cConv[..., 0], "Decoder_8_real")
             # display_feature(Trans_cConv[..., 1], "Decoder_8_imag")
-            mask_phase = Trans_cConv / (torch.abs(Trans_cConv) + 1e-8)
-            # print("mask_ph: ", mask_phase[0])
-            mask_mag = torch.tanh(torch.abs(Trans_cConv))
-            # print("mask_mag: ", mask_mag[0])
-            output = mask_phase * mask_mag # [batch, channel, 1539, 214, 2 ]
-            real = output[..., 0]
-            imag = output[..., 1]
-            mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
-            phase = torch.atan2(imag, real)
 
-            real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
-            imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
-            phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
-            mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
+            mask_phase = Trans_cConv / (torch.abs(Trans_cConv) + 1e-8)
+            # print("mask_ph: ", mask_phase.size())
+            mask_mag = torch.tanh(torch.abs(Trans_cConv))
+            # print("mask_mag: ", mask_mag.size())
+            output = mask_phase * mask_mag # [batch, channel, 1539, 214, 2 ]
+            # real = output[..., 0]
+            # imag = output[..., 1]
+            # mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
+            # phase = torch.atan2(imag, real)
+            #
+            # real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
+            # imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
+            # phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
+            # mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
 
             #display_spectrogram(real_db, "mask_Real")
             #display_spectrogram(imag_db, "mask_Imag")
@@ -91,6 +94,7 @@ class DCUNet10(nn.Module):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
+        # self.attn = MultiHeadAttention(args=args)
 
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), in_channels=1, out_channels=45)
@@ -161,6 +165,16 @@ class DCUNet16(nn.Module):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
+        self.real_attn = MultiHeadAttention(args=args)
+        self.imag_attn = MultiHeadAttention(args=args)
+
+        self.target_real_attn = MultiHeadAttention(args=args)
+        self.targeT_imag_attn = MultiHeadAttention(args=args)
+
+        self.real_cross_attn = MultiHeadAttention(args=args)
+        self.target_cross_attn = MultiHeadAttention(args=args)
+        # self.real_attn = SpatialGate()
+        # self.imag_attn = SpatialGate()
 
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
@@ -184,7 +198,7 @@ class DCUNet16(nn.Module):
                                       output_padding=(0, 1), bias=True, last=True)
 
 
-    def forward(self, x, is_istft=True):
+    def forward(self, x, target,is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
@@ -277,23 +291,79 @@ class DCUNet16(nn.Module):
         # print("   concat(u6,d0): ", c6.size())
 
         u7 = self.upsample7(c6)
-        # print("   u7: ", u7.size())
+        # print("   u7: ", u7.size()) # [1, 1, 1539, 214]
 
-        output = x * u7
+        """
+        mask selfattn
+        """
+        real = u7[..., 0]
+        imag = u7[..., 1]
+
+        real_mean = F.avg_pool2d(real, (27, 2)) # [1, 1, 57, 107]
+        imag_mean = F.avg_pool2d(imag, (27, 2))
+        # print("A", real_mean.size())
+        batch, channels, freq, time = real_mean.size()
+
+        real_mean = real_mean.view(batch, channels, -1) # [1, 1, 171 * 214]
+        imag_mean = imag_mean.view(batch, channels, -1)
+
+        # print(real_mean.size())
+        real_attn, real_score = self.real_attn(real_mean, real_mean, real_mean)
+        imag_attn, imag_score = self.imag_attn(imag_mean, imag_mean, imag_mean) # [1, 1, 171*214]
+
+        # real_attn = real_attn.view(batch, channels, freq, time)
+        # imag_attn = imag_attn.view(batch, channels, freq, time) # [1, 1, 171, 214]
+
+        # real_up = F.upsample(real_attn, scale_factor=(27, 2))
+        # imag_up = F.upsample(imag_attn, scale_factor=(27, 2))
+        # print(real_mean.size())
+
+        # u7_self_attn = torch.stack([real_up, imag_up], dim=-1)
+
+        """
+        target selfattn
+        """
+        target_real = target[..., 0]
+        target_imag = target[..., 1]
+
+        target_real_pool = F.avg_pool2d(target_real, (27, 2))
+        target_imag_pool = F.avg_pool2d(target_imag, (27, 2))
+
+        target_real_pool = target_real_pool.view(batch, channels, -1)
+        target_imag_pool = target_imag_pool.view(batch, channels, -1)
+
+        target_real_attn, target_real_score = self.target_real_attn(target_real_pool, target_real_pool, target_real_pool)
+        target_imag_attn, target_imag_score = self.target_real_attn(target_imag_pool, target_imag_pool, target_imag_pool)
+
+        real_cross_attn, realScore = self.real_cross_attn(target_real_attn, real_attn, real_attn)
+        imag_cross_attn, imageScore = self.real_cross_attn(target_imag_attn, imag_attn, imag_attn)
+
+        real_reshape = real_cross_attn.view(batch, channels, freq, time)
+        imag_reshape = imag_cross_attn.view(batch, channels, freq, time)
+
+        real_up = F.upsample(real_reshape, scale_factor=(27, 2))
+        imag_up = F.upsample(imag_reshape, scale_factor=(27, 2))
+
+        mask = torch.stack([real_up, imag_up], dim=-1)
+
+        output = x * mask
+        # print("pass", output.size())
 
         # print("x", x)
-        real = output[..., 0]
-        imag = output[..., 1]
+        # real = output[..., 0]
+        # imag = output[..., 1]
         # print(real.size())
-        mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
-        phase = torch.atan2(imag, real)
+        # mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
+        # phase = torch.atan2(imag, real)
 
-        real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
-        imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
-        phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
-        mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
+        # real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
+        # real_mean_db = librosa.amplitude_to_db(real_mean.cpu().detach().numpy())
+        # imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
+        # phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
+        # mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
 
-        #display_spectrogram(real_db, "denoising_real")
+        # display_spectrogram(real_db, "denoising_real")
+        # display_spectrogram(real_mean_db, "denoising_real_mean")
         #display_spectrogram(imag_db, "denoising_Imag")
         #display_spectrogram(mag_db, "denoising_mag")
         #display_spectrogram(phase_db, "denoising_phase")
