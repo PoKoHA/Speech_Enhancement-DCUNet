@@ -169,7 +169,7 @@ class DCUNet16(nn.Module):
         self.imag_attn = MultiHeadAttention(args=args)
 
         self.target_real_attn = MultiHeadAttention(args=args)
-        self.targeT_imag_attn = MultiHeadAttention(args=args)
+        self.target_imag_attn = MultiHeadAttention(args=args)
 
         self.real_cross_attn = MultiHeadAttention(args=args)
         self.target_cross_attn = MultiHeadAttention(args=args)
@@ -333,10 +333,10 @@ class DCUNet16(nn.Module):
         target_imag_pool = target_imag_pool.view(batch, channels, -1)
 
         target_real_attn, target_real_score = self.target_real_attn(target_real_pool, target_real_pool, target_real_pool)
-        target_imag_attn, target_imag_score = self.target_real_attn(target_imag_pool, target_imag_pool, target_imag_pool)
+        target_imag_attn, target_imag_score = self.target_imag_attn(target_imag_pool, target_imag_pool, target_imag_pool)
 
         real_cross_attn, realScore = self.real_cross_attn(target_real_attn, real_attn, real_attn)
-        imag_cross_attn, imageScore = self.real_cross_attn(target_imag_attn, imag_attn, imag_attn)
+        imag_cross_attn, imageScore = self.target_cross_attn(target_imag_attn, imag_attn, imag_attn)
 
         real_reshape = real_cross_attn.view(batch, channels, freq, time)
         imag_reshape = imag_cross_attn.view(batch, channels, freq, time)
@@ -346,6 +346,7 @@ class DCUNet16(nn.Module):
 
         mask = torch.stack([real_up, imag_up], dim=-1)
 
+        mask = mask * u7
         output = x * mask
         # print("pass", output.size())
 
