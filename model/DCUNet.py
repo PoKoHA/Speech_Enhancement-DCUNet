@@ -10,11 +10,14 @@ import librosa
 import torch
 import torch.nn as nn
 
+from utils.utils import display_feature
+
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
-
-from utils.utils import display_feature
 from model.attention import *
+from model.embedding import *
+from model.sublayer import *
+from model.transformer import SpeechTransformer
 
 class EncoderBlock(nn.Module):
 
@@ -165,17 +168,21 @@ class DCUNet16(nn.Module):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
-        self.real_attn = MultiHeadAttention(args=args)
-        self.imag_attn = MultiHeadAttention(args=args)
 
-        self.target_real_attn = MultiHeadAttention(args=args)
-        self.target_imag_attn = MultiHeadAttention(args=args)
-
-        self.real_cross_attn = MultiHeadAttention(args=args)
-        self.target_cross_attn = MultiHeadAttention(args=args)
+        # self.real_attn = MultiHeadAttention(args=args)
+        #
+        # self.imag_attn = MultiHeadAttention(args=args)
+        #
+        # self.target_real_attn = MultiHeadAttention(args=args)
+        # self.target_imag_attn = MultiHeadAttention(args=args)
+        #
+        # self.real_cross_attn = MultiHeadAttention(args=args)
+        # self.target_cross_attn = MultiHeadAttention(args=args)
         # self.real_attn = SpatialGate()
         # self.imag_attn = SpatialGate()
 
+        self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
+        self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
         self.downsample1 = EncoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=32, out_channels=32)
@@ -201,7 +208,7 @@ class DCUNet16(nn.Module):
     def forward(self, x, target,is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
-        # print("       Input(spec): ", x.size())
+        print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
         d0 = self.downsample0(x)
@@ -299,24 +306,27 @@ class DCUNet16(nn.Module):
         real = u7[..., 0]
         imag = u7[..., 1]
 
-        real_mean = F.avg_pool2d(real, (27, 2)) # [1, 1, 57, 107]
-        imag_mean = F.avg_pool2d(imag, (27, 2))
-        # print("A", real_mean.size())
-        batch, channels, freq, time = real_mean.size()
+        real_pool = F.avg_pool2d(real, (27, 2)) # [1, 1, 57, 107]
+        imag_pool = F.avg_pool2d(imag, (27, 2))
+        # print("A", real_pool.size())
+        batch, channels, freq, time = real_pool.size()
+        #
+        real_pool = real_pool.view(batch, channels, -1) # [1, 1, 6099=length]
+        imag_pool = imag_pool.view(batch, channels, -1)
 
-        real_mean = real_mean.view(batch, channels, -1) # [1, 1, 171 * 214]
-        imag_mean = imag_mean.view(batch, channels, -1)
-
-        # print(real_mean.size())
-        real_attn, real_score = self.real_attn(real_mean, real_mean, real_mean)
-        imag_attn, imag_score = self.imag_attn(imag_mean, imag_mean, imag_mean) # [1, 1, 171*214]
+        real_pool = real_pool.permute(0, 2, 1)
+        imag_pool = imag_pool.permute(0, 2, 1)
+        #
+        # # print(real_pool.size())
+        # real_attn, real_score = self.real_attn(real_pool, real_pool, real_pool)
+        # imag_attn, imag_score = self.imag_attn(imag_pool, imag_pool, imag_pool) # [1, 1, 171*214]
 
         # real_attn = real_attn.view(batch, channels, freq, time)
         # imag_attn = imag_attn.view(batch, channels, freq, time) # [1, 1, 171, 214]
 
         # real_up = F.upsample(real_attn, scale_factor=(27, 2))
         # imag_up = F.upsample(imag_attn, scale_factor=(27, 2))
-        # print(real_mean.size())
+        # print(real_pool.size())
 
         # u7_self_attn = torch.stack([real_up, imag_up], dim=-1)
 
@@ -328,25 +338,33 @@ class DCUNet16(nn.Module):
 
         target_real_pool = F.avg_pool2d(target_real, (27, 2))
         target_imag_pool = F.avg_pool2d(target_imag, (27, 2))
-
+        #
         target_real_pool = target_real_pool.view(batch, channels, -1)
         target_imag_pool = target_imag_pool.view(batch, channels, -1)
 
-        target_real_attn, target_real_score = self.target_real_attn(target_real_pool, target_real_pool, target_real_pool)
-        target_imag_attn, target_imag_score = self.target_imag_attn(target_imag_pool, target_imag_pool, target_imag_pool)
+        target_real_pool = target_real_pool.permute(0, 2, 1)
+        target_imag_pool = target_imag_pool.permute(0, 2, 1)
 
-        real_cross_attn, realScore = self.real_cross_attn(target_real_attn, real_attn, real_attn)
-        imag_cross_attn, imageScore = self.target_cross_attn(target_imag_attn, imag_attn, imag_attn)
+        real_attn = self.real_transformer(real_pool, target_real_pool)
+        imag_attn = self.imag_transformer(imag_pool, target_imag_pool)
+        # target_real_attn, target_real_score = self.target_real_attn(target_real_pool, target_real_pool, target_real_pool)
+        # target_imag_attn, target_imag_score = self.target_imag_attn(target_imag_pool, target_imag_pool, target_imag_pool)
+        #
+        # real_cross_attn, realScore = self.real_cross_attn(target_real_attn, real_attn, real_attn)
+        # imag_cross_attn, imageScore = self.target_cross_attn(target_imag_attn, imag_attn, imag_attn)
 
-        real_reshape = real_cross_attn.view(batch, channels, freq, time)
-        imag_reshape = imag_cross_attn.view(batch, channels, freq, time)
+        real_attn = real_attn.permute(0, 2, 1)
+        imag_attn = imag_attn.permute(0, 2, 1)
+
+        real_reshape = real_attn.view(batch, channels, freq, time)
+        imag_reshape = imag_attn.view(batch, channels, freq, time)
 
         real_up = F.upsample(real_reshape, scale_factor=(27, 2))
         imag_up = F.upsample(imag_reshape, scale_factor=(27, 2))
-
+        #
         mask = torch.stack([real_up, imag_up], dim=-1)
 
-        mask = mask * u7
+        # mask = mask * u7
         output = x * mask
         # print("pass", output.size())
 
@@ -358,7 +376,7 @@ class DCUNet16(nn.Module):
         # phase = torch.atan2(imag, real)
 
         # real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
-        # real_mean_db = librosa.amplitude_to_db(real_mean.cpu().detach().numpy())
+        # real_mean_db = librosa.amplitude_to_db(real_pool.cpu().detach().numpy())
         # imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
         # phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
         # mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
@@ -390,4 +408,3 @@ def display_spectrogram(x, title):
     plt.colorbar(format="%+2.f dB")
     plt.title(title)
     plt.show()
-

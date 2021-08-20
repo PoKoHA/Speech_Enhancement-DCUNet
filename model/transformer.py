@@ -1,0 +1,151 @@
+import numpy as np
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from model.sublayer import *
+from model.embedding import *
+from model.attention import *
+
+class EncoderLayer(nn.Module):
+
+    def __init__(self, d_model=512, n_heads=8, d_ff=2048):
+        super(EncoderLayer, self).__init__()
+        self.self_attention = AddNorm(MultiHeadAttention(d_model, n_heads), d_model)
+        self.feed_forward = AddNorm(PositionWiseFeedForwardNet(d_model, d_ff), d_model)
+
+    def forward(self, inputs, mask=None):
+        attn_output, attn_map = self.self_attention(inputs, inputs, inputs, mask)
+        output = self.feed_forward(attn_output)
+
+        return output, attn_map
+
+class Encoder(nn.Module):
+
+    def __init__(self, args, d_model=512, input_dim=1, d_ff=2048, n_layers=6, n_heads=8, dropout_p=0.3):
+        super(Encoder, self).__init__()
+
+        self.args = args
+        self.d_model = d_model
+        self.n_layers = n_layers
+        self.n_heads = n_heads
+
+        self.linear = nn.Linear(input_dim, d_model) # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
+        init_weight(self.linear)
+
+        self.dropout = nn.Dropout(dropout_p)
+        self.positional_encoding = PositionalEncoding(d_model)
+
+        self.layers = nn.ModuleList([EncoderLayer(d_model, n_heads, d_ff) for _ in range(n_layers)])
+
+    def forward(self, inputs):
+        # print('--[Encoder]--')
+
+        outputs = self.linear(inputs)
+        outputs += self.positional_encoding(outputs.size(1))
+        outputs = self.dropout(outputs)
+
+        for layer in self.layers:
+            outputs, attn = layer(outputs, None)
+
+        return outputs, attn
+
+############################################
+class DecoderLayer(nn.Module):
+
+    def __init__(self, d_model=512, n_heads=8, d_ff=2048):
+        super(DecoderLayer, self).__init__()
+
+        self.self_attention = AddNorm(MultiHeadAttention(d_model, n_heads), d_model)
+        self.cross_attention = AddNorm(MultiHeadAttention(d_model, n_heads), d_model)
+        self.feed_forward = AddNorm(PositionWiseFeedForwardNet(d_model, d_ff), d_model)
+
+    def forward(self, inputs, encoder_outputs, mask=None, cross_mask=None):
+        output, self_attn = self.self_attention(inputs, inputs, inputs, mask)
+        output, cross_attn = self.cross_attention(output, encoder_outputs, encoder_outputs, cross_mask)
+        output = self.feed_forward(output)
+        # print("output: ", output.size())
+        # print("cross_attn: ", cross_attn.size())
+
+        return output, self_attn, cross_attn
+
+
+class Decoder(nn.Module):
+
+    def __init__(
+            self,
+            args,
+            input_dim,
+            d_model=512,
+            d_ff=2048,
+            n_layers=6,
+            n_heads=8,
+            dropout_p=0.3,
+    ):
+        super(Decoder, self).__init__()
+
+        self.args = args
+        self.d_model = d_model
+        self.n_layers = n_layers
+        self.n_heads = n_heads
+
+        self.linear = nn.Linear(input_dim, d_model) # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
+        self.positional_encoding = PositionalEncoding(d_model)
+        self.dropout = nn.Dropout(dropout_p)
+        self.layers = nn.ModuleList([
+            DecoderLayer(d_model, n_heads, d_ff) for _ in range(n_layers)
+        ])
+
+        self.layerNorm = LayerNorm(d_model)
+        self.fc = nn.Linear(d_model, 1, bias=False)
+
+    def forward(self, inputs, encoder_outputs, decoder_mask=None, encoder_pad_mask=None):
+        # print('--[Encoder]--')
+
+        outputs = self.linear(inputs)
+        outputs += self.positional_encoding(outputs.size(1))
+        outputs = self.dropout(outputs)
+
+        for layer in self.layers:
+            outputs, self_attn, cross_attn = layer(
+                outputs, encoder_outputs, decoder_mask, encoder_pad_mask
+            )
+
+        return outputs, self_attn, cross_attn
+
+
+class SpeechTransformer(nn.Module):
+
+    def __init__(self, args, input_dim=1, d_model=32, d_ff=128, n_heads=8, n_encoder_layers=3,
+                 n_decoder_layers=3, dropout_p=0.3, max_length=7000):
+        super(SpeechTransformer, self).__init__()
+        assert d_model % n_heads ==0
+
+        self.encoder = Encoder(
+            args=args,
+            d_model=d_model,
+            input_dim=input_dim,
+            d_ff=d_ff,
+            n_heads=n_heads,
+            n_layers=n_encoder_layers,
+            dropout_p=dropout_p,
+        )
+
+        self.decoder = Decoder(
+            args=args,
+            input_dim=input_dim,
+            d_model=d_model,
+            d_ff=d_ff,
+            n_layers=n_decoder_layers,
+            n_heads=n_heads,
+            dropout_p=dropout_p,
+        )
+
+    def forward(self, mask, target):
+
+        encoder_outputs, encoder_attn = self.encoder(mask)
+        decoder_outputs, target_self_attn, cross_attn = self.decoder(target, encoder_outputs)
+
+        return decoder_outputs
+

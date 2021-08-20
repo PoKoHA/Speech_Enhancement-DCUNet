@@ -15,57 +15,71 @@ def init_weight(m):
     if m.bias is not None:
         nn.init.constant_(m.bias, 0)
 
-class SelfAttention(nn.Module):
+class ScaledDotProductAttention(nn.Module):
 
-    def __init__(self, args):
-        super(SelfAttention, self).__init__()
-        self.hidden_dim = 6099
-        self.attention_dim = 6099 // args.n_head
-
-        self.linear_Q = nn.Linear(6099, self.attention_dim)
-        self.linear_K = nn.Linear(6099, self.attention_dim)
-        self.linear_V = nn.Linear(6099, self.attention_dim)
-
-        self.dropout = nn.Dropout(args.dropout)
-        self.scale_factor = torch.sqrt(torch.FloatTensor([self.attention_dim])).cuda(args.gpu)
+    def __init__(self, dim, dropout_p=0.1):
+        super(ScaledDotProductAttention, self).__init__()
+        self.sqrt_dim = np.sqrt(dim)
+        self.dropout = nn.Dropout(dropout_p)
 
     def forward(self, query, key, value, mask=None):
-        q = self.linear_Q(query)
-        k = self.linear_K(key)
-        v = self.linear_V(value)
-
-        self_attention = torch.bmm(q, k.permute(0, 2, 1))
-        self_attention = self_attention / self.scale_factor
+        score = torch.bmm(query, key.transpose(1, 2)) / self.sqrt_dim
 
         if mask is not None:
-            self_attention = self_attention.masked_fill(mask, -np.inf)
+            # print("score: ", score.size())
+            # print("mask: ", mask.size())
+            score.masked_fill_(mask, -np.inf)
 
-        attn_score = F.softmax(self_attention, dim=-1)
-        dropout = self.dropout(attn_score)
+        attn = F.softmax(score, -1)
+        attn = self.dropout(attn)
+        context = torch.bmm(attn, value)
 
-        weighted_v = torch.bmm(dropout, v)
+        return context, attn
 
-        return self.dropout(weighted_v), attn_score
 
 class MultiHeadAttention(nn.Module):
 
-    def __init__(self, args):
+    def __init__(self, d_model=512, n_heads=8):
         super(MultiHeadAttention, self).__init__()
-        self.attentions = nn.ModuleList([SelfAttention(args).cuda(args.gpu)
-                                         for _ in range(args.n_head)]).cuda(args.gpu)
+        assert d_model % n_heads == 0, "attention dim = d_model / heads 해야 하기 때문에"
 
-        self.o_w = nn.Linear(6099, 6099, bias=False).cuda(args.gpu)
-        init_weight(self.o_w)
-        self.dropout = nn.Dropout(args.dropout)
+        self.attn_dim = int(d_model / n_heads) # default:64
+        self.n_heads = n_heads
 
-    def forward(self, query, key, value, mask=None):
-        self_attentions = [attention(query, key, value, mask) for attention in self.attentions]
-        weight_vs = [weighted_v[0] for weighted_v in self_attentions]
-        attentions = [weighted_v[1] for weighted_v in self_attentions]
-        weighted_v = torch.cat(weight_vs, dim=-1)
-        output = self.dropout(self.o_w(weighted_v))
+        # todo 뒤 사이즈가 조금 다름 원래 attn_dim만 들어갔는데
+        # Projection
+        self.Linear_Q = nn.Linear(d_model, self.attn_dim * n_heads, bias=True)
+        self.Linear_K = nn.Linear(d_model, self.attn_dim * n_heads, bias=True)
+        self.Linear_V = nn.Linear(d_model, self.attn_dim * n_heads, bias=True)
+        init_weight(self.Linear_Q)
+        init_weight(self.Linear_K)
+        init_weight(self.Linear_V)
 
-        return output, attentions
+        self.scaled_dot_attn = ScaledDotProductAttention(self.attn_dim) # sqrt(d_k)
+
+    def forward(self, q, k, v, mask=None):
+        batch_size = v.size(0)
+
+        # [Batch, Length, N, D] = [Batch, Length, 8, 64]
+        query = self.Linear_Q(q).view(batch_size, -1, self.n_heads, self.attn_dim)
+        key = self.Linear_K(k).view(batch_size, -1, self.n_heads, self.attn_dim)
+        value = self.Linear_V(v).view(batch_size, -1, self.n_heads, self.attn_dim)
+
+        # [Batch * N, Length, Dim]
+        query = query.permute(2, 0, 1, 3).contiguous().view(batch_size * self.n_heads, -1, self.attn_dim)
+        key = key.permute(2, 0, 1, 3).contiguous().view(batch_size * self.n_heads, -1, self.attn_dim)
+        value = value.permute(2, 0, 1, 3).contiguous().view(batch_size * self.n_heads, -1, self.attn_dim)
+
+        # mask
+        if mask is not None:
+            mask = mask.repeat(self.n_heads, 1, 1)
+
+        context, attn = self.scaled_dot_attn(query, key, value, mask)
+        context = context.view(self.n_heads, batch_size, -1, self.attn_dim)
+        context = context.permute(1, 2, 0, 3).contiguous().view(batch_size, -1, self.n_heads * self.attn_dim)
+
+        return context, attn
+
 
 ########
 # CBAM
