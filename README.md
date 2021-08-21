@@ -1,6 +1,5 @@
-**TEST_01 Branch 에서는 Mask에 MultiHeadSelfAttention 해주고
-Teacher_forcing처럼 Target MultiHeadSelfAttention --> Mask output과 MultiHeadCrossAttention**
-
+**test_2 Branch: Mask(Decoder 마지막 layer output)의 Real, Imag 그리고 Target의 Real, Imag을 Transformer에 넣어 각각 Real과 Imag끼리 MultiHead
+cross Attention 실행**
 
 - Result folder에 Spectrogram 비교 첨부 
 
