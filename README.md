@@ -1,5 +1,5 @@
-**TEST_01 Branch 에서는 Mask에 MultiHeadSelfAttention 해주고
-Teacher_forcing처럼 Target MultiHeadSelfAttention --> Mask output과 MultiHeadCrossAttention**
+**TEST_02 Branch: Mask나 mixed Input의 Spectrogram shape는 [batch, channel=1, freq, time, 실수 허수],
+여기서 Time을 Length로 두고 freq을 Dim로 두어 Real과 Imag끼리 MultiHeadAttention 수행**
 
 
 - Result folder에 Spectrogram 비교 첨부 

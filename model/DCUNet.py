@@ -208,7 +208,7 @@ class DCUNet16(nn.Module):
     def forward(self, x, target,is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
-        print("       Input(spec): ", x.size())
+        # print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
         d0 = self.downsample0(x)
@@ -298,73 +298,37 @@ class DCUNet16(nn.Module):
         # print("   concat(u6,d0): ", c6.size())
 
         u7 = self.upsample7(c6)
-        # print("   u7: ", u7.size()) # [1, 1, 1539, 214]
+        # print("   u7: ", u7.size()) # [1, 1, 1539, 214, 2]
 
         """
         mask selfattn
         """
-        real = u7[..., 0]
+        real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
         imag = u7[..., 1]
-
-        real_pool = F.avg_pool2d(real, (27, 2)) # [1, 1, 57, 107]
-        imag_pool = F.avg_pool2d(imag, (27, 2))
-        # print("A", real_pool.size())
-        batch, channels, freq, time = real_pool.size()
-        #
-        real_pool = real_pool.view(batch, channels, -1) # [1, 1, 6099=length]
-        imag_pool = imag_pool.view(batch, channels, -1)
-
-        real_pool = real_pool.permute(0, 2, 1)
-        imag_pool = imag_pool.permute(0, 2, 1)
-        #
-        # # print(real_pool.size())
-        # real_attn, real_score = self.real_attn(real_pool, real_pool, real_pool)
-        # imag_attn, imag_score = self.imag_attn(imag_pool, imag_pool, imag_pool) # [1, 1, 171*214]
-
-        # real_attn = real_attn.view(batch, channels, freq, time)
-        # imag_attn = imag_attn.view(batch, channels, freq, time) # [1, 1, 171, 214]
-
-        # real_up = F.upsample(real_attn, scale_factor=(27, 2))
-        # imag_up = F.upsample(imag_attn, scale_factor=(27, 2))
-        # print(real_pool.size())
-
-        # u7_self_attn = torch.stack([real_up, imag_up], dim=-1)
+        real = real.squeeze(1).permute(0, 2, 1) # [batch, time, freq]
+        imag = imag.squeeze(1).permute(0, 2, 1)
 
         """
         target selfattn
         """
         target_real = target[..., 0]
         target_imag = target[..., 1]
+        target_real = target_real.squeeze(1).permute(0, 2, 1)
+        target_imag = target_imag.squeeze(1).permute(0, 2, 1)
 
-        target_real_pool = F.avg_pool2d(target_real, (27, 2))
-        target_imag_pool = F.avg_pool2d(target_imag, (27, 2))
-        #
-        target_real_pool = target_real_pool.view(batch, channels, -1)
-        target_imag_pool = target_imag_pool.view(batch, channels, -1)
-
-        target_real_pool = target_real_pool.permute(0, 2, 1)
-        target_imag_pool = target_imag_pool.permute(0, 2, 1)
-
-        real_attn = self.real_transformer(real_pool, target_real_pool)
-        imag_attn = self.imag_transformer(imag_pool, target_imag_pool)
-        # target_real_attn, target_real_score = self.target_real_attn(target_real_pool, target_real_pool, target_real_pool)
-        # target_imag_attn, target_imag_score = self.target_imag_attn(target_imag_pool, target_imag_pool, target_imag_pool)
-        #
-        # real_cross_attn, realScore = self.real_cross_attn(target_real_attn, real_attn, real_attn)
-        # imag_cross_attn, imageScore = self.target_cross_attn(target_imag_attn, imag_attn, imag_attn)
+        real_attn = self.real_transformer(real, target_real)
+        imag_attn = self.imag_transformer(imag, target_imag)
 
         real_attn = real_attn.permute(0, 2, 1)
         imag_attn = imag_attn.permute(0, 2, 1)
 
-        real_reshape = real_attn.view(batch, channels, freq, time)
-        imag_reshape = imag_attn.view(batch, channels, freq, time)
+        real_attn = real_attn.unsqueeze(1)
+        imag_attn = imag_attn.unsqueeze(1)
 
-        real_up = F.upsample(real_reshape, scale_factor=(27, 2))
-        imag_up = F.upsample(imag_reshape, scale_factor=(27, 2))
-        #
-        mask = torch.stack([real_up, imag_up], dim=-1)
+        mask = torch.stack([real_attn, imag_attn], dim=-1)
+        # print(mask.size())
 
-        # mask = mask * u7
+        mask = mask * u7
         output = x * mask
         # print("pass", output.size())
 

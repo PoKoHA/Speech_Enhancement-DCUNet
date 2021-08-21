@@ -23,7 +23,7 @@ class EncoderLayer(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, args, d_model=512, input_dim=1, d_ff=2048, n_layers=6, n_heads=8, dropout_p=0.3):
+    def __init__(self, args, d_model=512, input_dim=1539, d_ff=2048, n_layers=6, n_heads=8, dropout_p=0.3):
         super(Encoder, self).__init__()
 
         self.args = args
@@ -41,7 +41,7 @@ class Encoder(nn.Module):
 
     def forward(self, inputs):
         # print('--[Encoder]--')
-
+        # print("I", inputs.size())
         outputs = self.linear(inputs)
         outputs += self.positional_encoding(outputs.size(1))
         outputs = self.dropout(outputs)
@@ -98,7 +98,7 @@ class Decoder(nn.Module):
         ])
 
         self.layerNorm = LayerNorm(d_model)
-        self.fc = nn.Linear(d_model, 1, bias=False)
+        self.fc = nn.Linear(d_model, input_dim, bias=False)
 
     def forward(self, inputs, encoder_outputs, decoder_mask=None, encoder_pad_mask=None):
         # print('--[Encoder]--')
@@ -112,12 +112,14 @@ class Decoder(nn.Module):
                 outputs, encoder_outputs, decoder_mask, encoder_pad_mask
             )
 
+        outputs = self.fc(outputs)
+
         return outputs, self_attn, cross_attn
 
 
 class SpeechTransformer(nn.Module):
 
-    def __init__(self, args, input_dim=1, d_model=32, d_ff=128, n_heads=8, n_encoder_layers=3,
+    def __init__(self, args, input_dim=1539, d_model=512, d_ff=2048, n_heads=8, n_encoder_layers=3,
                  n_decoder_layers=3, dropout_p=0.3, max_length=7000):
         super(SpeechTransformer, self).__init__()
         assert d_model % n_heads ==0
