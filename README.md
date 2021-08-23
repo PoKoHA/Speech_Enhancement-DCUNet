@@ -1,7 +1,6 @@
 **test_2 Branch: Mask(Decoder 마지막 layer output)의 Real, Imag 그리고 Target의 Real, Imag을 Transformer에 넣어 각각 Real과 Imag끼리 MultiHead
 cross Attention 실행**
-
-- Result folder에 Spectrogram 비교 첨부 
+>> pesq:3.1136 batch=2 결과는 차이가 없는데 GPU Memory는 급격히 잡아먹음
 
 > 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여
 > 좋은 결과를 만들어냄
