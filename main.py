@@ -11,10 +11,13 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
+import torch.nn.parallel
 import torch.backends.cudnn as cudnn
+import torch.distributed as dist
+import torch.optim as optim
+import torch.multiprocessing as mp
 import torch.utils.data
+import torch.utils.data.distributed
 
 from data.dataset import SpeechDataset
 from model.DCUNet import *
@@ -29,7 +32,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--epochs', type=int, default=100, help='Number of max epochs in training (default: 100)')
 parser.add_argument('--start-epoch', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=4, help='Number of workers in dataset loader (default: 4)')
+parser.add_argument('--workers', type=int, default=4, help='Number of workers in dataset loader (default: 4)')
 parser.add_argument('--batch-size', type=int, default=32, help='Batch size in training (default: 32)')
 parser.add_argument('--lr', default=1e-4)
 parser.add_argument('--arch', type=str, default="DCUnet10")
@@ -56,7 +59,20 @@ parser.add_argument('--dropout', default=0.1, type=float)
 parser.add_argument('--generate', '-g', default=False, action='store_true')
 parser.add_argument('--denoising-file', type=str, help="denoising 하고 싶은 파일경로")
 
-
+# Distributed
+parser.add_argument('--world-size', default=-1, type=int,
+                    help='number of nodes for distributed training')
+parser.add_argument('--rank', default=-1, type=int,
+                    help='node rank for distributed training')
+parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+                    help='url used to set up distributed training')
+parser.add_argument('--dist-backend', default='nccl', type=str,
+                    help='distributed backend')
+parser.add_argument('--multiprocessing-distributed', action='store_true',
+                    help='Use multi-processing distributed training to launch '
+                         'N processes per node, which has N GPUs. This is the '
+                         'fastest way to use PyTorch for either single node or '
+                         'multi node data parallel training')
 
 def main():
     args = parser.parse_args()
@@ -75,9 +91,22 @@ def main():
         warnings.warn('You have chosen a specific GPU. This will completely '
                       'disable data parallelism.')
 
-    ngpus_per_node = torch.cuda.device_count() # node: server(기계)라고 생각
+    if args.dist_url == "env://" and args.world_size == -1:
+        args.world_size = int(os.environ["WORLD_SIZE"])
 
-    main_worker(args.gpu, ngpus_per_node, args)
+    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
+
+    ngpus_per_node = torch.cuda.device_count()
+    if args.multiprocessing_distributed:
+        # Since we have ngpus_per_node processes per node, the total world_size
+        # needs to be adjusted accordingly
+        args.world_size = ngpus_per_node * args.world_size
+        # Use torch.multiprocessing.spawn to launch distributed processes: the
+        # main_worker process function
+        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
+    else:
+        # Simply call main_worker function
+        main_worker(args.gpu, ngpus_per_node, args)
 
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
@@ -94,6 +123,16 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
 
+    if args.distributed:
+        if args.dist_url == "env://" and args.rank == -1:
+            args.rank = int(os.environ["RANK"])
+        if args.multiprocessing_distributed:
+            # For multiprocessing distributed training, rank needs to be the
+            # global rank among all the processes
+            args.rank = args.rank * ngpus_per_node + gpu
+        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                                world_size=args.world_size, rank=args.rank)
+
     # Model
     if args.arch == 'DCUnet10':
         model = DCUNet10(args=args, n_fft=N_FFT, hop_length=HOP_LENGTH)
@@ -104,6 +143,24 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
+    elif args.distributed:
+        # For multiprocessing distributed, DistributedDataParallel constructor
+        # should always set the single device scope, otherwise,
+        # DistributedDataParallel will use all available devices.
+        if args.gpu is not None:
+            torch.cuda.set_device(args.gpu)
+            model.cuda(args.gpu)
+            # When using a single GPU per process and per
+            # DistributedDataParallel, we need to divide the batch size
+            # ourselves based on the total number of GPUs we have
+            args.batch_size = int(args.batch_size / ngpus_per_node)
+            args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+        else:
+            model.cuda()
+            # DistributedDataParallel will divide and allocate batch_size to all
+            # available GPUs if device_ids are not set
+            model = torch.nn.parallel.DistributedDataParallel(model)
 
     elif args.gpu is not None:
         torch.cuda.set_device(args.gpu)
@@ -162,13 +219,20 @@ def main_worker(gpu, ngpus_per_node, args):
     valid_dataset = SpeechDataset(args, mixed_valid_files, clean_valid_files, args.max_len, N_FFT, HOP_LENGTH)
     test_dataset = SpeechDataset(args, mixed_test_files, clean_test_files, args.max_len, N_FFT, HOP_LENGTH)
 
+    # Sampler
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    else:
+        train_sampler = None
+
     # Dataloader
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
-                                               num_workers=args.num_workers, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
+                                               shuffle=(train_sampler is None),
+                                               num_workers=args.workers, pin_memory=True, sampler=train_sampler)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False,
-                                               num_workers=args.num_workers, pin_memory=True)
+                                               num_workers=args.workers, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False,
-                                              num_workers=args.num_workers, pin_memory=True)
+                                              num_workers=args.workers, pin_memory=True)
 
     # Evaluate
     if args.evaluate:
@@ -182,6 +246,10 @@ def main_worker(gpu, ngpus_per_node, args):
     best_PESQ = -1e10
 
     for epoch in range(args.start_epoch, args.epochs):
+
+        if args.distributed:
+            train_sampler.set_epoch(epoch)
+
         train(train_loader, model, criterion, optimizer, scheduler, epoch, N_FFT, HOP_LENGTH, args)
         print("--validate--")
         PESQ, loss = validate(valid_loader, model, criterion, N_FFT, HOP_LENGTH, args)

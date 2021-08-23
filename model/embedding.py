@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model=512, max_len=215):
+    def __init__(self, d_model=512, max_len=1600):
         super(PositionalEncoding, self).__init__()
 
         PE = torch.zeros(max_len, d_model, requires_grad=False)

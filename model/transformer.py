@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from model.sublayer import *
 from model.embedding import *
 from model.attention import *
+from model.VGGExtractor import VGGExtractor
 
 class EncoderLayer(nn.Module):
 
@@ -26,12 +27,15 @@ class Encoder(nn.Module):
     def __init__(self, args, d_model=512, input_dim=1539, d_ff=2048, n_layers=6, n_heads=8, dropout_p=0.3):
         super(Encoder, self).__init__()
 
+        super(Encoder, self).__init__()
+
         self.args = args
         self.d_model = d_model
         self.n_layers = n_layers
         self.n_heads = n_heads
 
-        self.linear = nn.Linear(input_dim, d_model) # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
+        self.conv = VGGExtractor(args=args, input_dim=input_dim)
+        self.linear = nn.Linear(3392, d_model)  # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
         init_weight(self.linear)
 
         self.dropout = nn.Dropout(dropout_p)
@@ -42,13 +46,18 @@ class Encoder(nn.Module):
     def forward(self, inputs):
         # print('--[Encoder]--')
         # print("I", inputs.size())
-        outputs = self.linear(inputs)
+        conv_outputs = self.conv(inputs)
+        # print("p", conv_outputs.size())
+        # print(self.linear)
+        outputs = self.linear(conv_outputs)
+        # print("E_li:", outputs.size())
+        # print("pos", self.positional_encoding(outputs.size(1)).size())
         outputs += self.positional_encoding(outputs.size(1))
         outputs = self.dropout(outputs)
 
         for layer in self.layers:
             outputs, attn = layer(outputs, None)
-
+        # print("En out:", outputs.size())
         return outputs, attn
 
 ############################################
@@ -90,9 +99,13 @@ class Decoder(nn.Module):
         self.n_layers = n_layers
         self.n_heads = n_heads
 
-        self.linear = nn.Linear(input_dim, d_model) # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
-        self.positional_encoding = PositionalEncoding(d_model)
+        self.conv = VGGExtractor(args=args, input_dim=input_dim)
+        self.linear = nn.Linear(3392, d_model)  # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
+        init_weight(self.linear)
+
         self.dropout = nn.Dropout(dropout_p)
+        self.positional_encoding = PositionalEncoding(d_model)
+
         self.layers = nn.ModuleList([
             DecoderLayer(d_model, n_heads, d_ff) for _ in range(n_layers)
         ])
@@ -101,9 +114,9 @@ class Decoder(nn.Module):
         self.fc = nn.Linear(d_model, input_dim, bias=False)
 
     def forward(self, inputs, encoder_outputs, decoder_mask=None, encoder_pad_mask=None):
-        # print('--[Encoder]--')
 
-        outputs = self.linear(inputs)
+        conv_outputs = self.conv(inputs)
+        outputs = self.linear(conv_outputs)
         outputs += self.positional_encoding(outputs.size(1))
         outputs = self.dropout(outputs)
 
@@ -112,14 +125,16 @@ class Decoder(nn.Module):
                 outputs, encoder_outputs, decoder_mask, encoder_pad_mask
             )
 
+        # print("Decoder: ", outputs.size())
         outputs = self.fc(outputs)
+        # print("De_out: ", outputs.size())
 
         return outputs, self_attn, cross_attn
 
 
 class SpeechTransformer(nn.Module):
 
-    def __init__(self, args, input_dim=1539, d_model=512, d_ff=2048, n_heads=8, n_encoder_layers=3,
+    def __init__(self, args, input_dim=214, d_model=512, d_ff=2048, n_heads=8, n_encoder_layers=3,
                  n_decoder_layers=3, dropout_p=0.3, max_length=7000):
         super(SpeechTransformer, self).__init__()
         assert d_model % n_heads ==0
@@ -147,7 +162,7 @@ class SpeechTransformer(nn.Module):
     def forward(self, mask, target):
 
         encoder_outputs, encoder_attn = self.encoder(mask)
+        # print("pass")
         decoder_outputs, target_self_attn, cross_attn = self.decoder(target, encoder_outputs)
 
         return decoder_outputs
-

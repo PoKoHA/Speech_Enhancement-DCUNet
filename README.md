@@ -1,6 +1,4 @@
-**TEST_02 Branch: Mask나 mixed Input의 Spectrogram shape는 [batch, channel=1, freq, time, 실수 허수],
-여기서 Time을 Length로 두고 freq을 Dim로 두어 Real과 Imag끼리 MultiHeadAttention 수행**
-
+**TEST_03 Branch: ASR Transformer그대로 이용 / AST Transformer는 Decoder Input이 Text이므로 Encoder 형식과 똑같이만 되도록 수정하였음**
 
 - Result folder에 Spectrogram 비교 첨부 
 

@@ -305,28 +305,24 @@ class DCUNet16(nn.Module):
         """
         real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
         imag = u7[..., 1]
-        real = real.squeeze(1).permute(0, 2, 1) # [batch, time, freq]
-        imag = imag.squeeze(1).permute(0, 2, 1)
 
-        """
-        target selfattn
-        """
         target_real = target[..., 0]
         target_imag = target[..., 1]
-        target_real = target_real.squeeze(1).permute(0, 2, 1)
-        target_imag = target_imag.squeeze(1).permute(0, 2, 1)
 
+        # print("input", real.size())
         real_attn = self.real_transformer(real, target_real)
         imag_attn = self.imag_transformer(imag, target_imag)
 
-        real_attn = real_attn.permute(0, 2, 1)
-        imag_attn = imag_attn.permute(0, 2, 1)
-
-        real_attn = real_attn.unsqueeze(1)
-        imag_attn = imag_attn.unsqueeze(1)
-
+        # print("real", real_attn.size())
         mask = torch.stack([real_attn, imag_attn], dim=-1)
         # print(mask.size())
+        # print("mask", mask.size())
+
+        # m_db = librosa.amplitude_to_db(u7[..., 0].cpu().detach().numpy())
+        # display_spectrogram(m_db, "u7")
+        # m2_db = librosa.amplitude_to_db(mask[..., 0].cpu().detach().numpy())
+        # display_spectrogram(m2_db, "mask")
+
 
         mask = mask * u7
         output = x * mask
