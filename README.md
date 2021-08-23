@@ -1,4 +1,4 @@
-**TEST_03 Branch: ASR Transformer그대로 이용 / AST Transformer는 Decoder Input이 Text이므로 Encoder 형식과 똑같이만 되도록 수정하였음**
+**TEST_04 Branch: Output(Denoising된)을 ISTFT 걸친 후 Time-domain(shape:[batch, channel=1, SampleRate * TIme])에서 Target을 Decoder Input으로 해서 CrossAttention 실행**
 
 - Result folder에 Spectrogram 비교 첨부 
 
