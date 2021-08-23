@@ -18,6 +18,8 @@ from model.attention import *
 from model.embedding import *
 from model.sublayer import *
 from model.transformer import SpeechTransformer
+from model.nlpTransformer.transformer import Transformer
+from model.gram_matrix import gram_matrix
 
 class EncoderBlock(nn.Module):
 
@@ -169,6 +171,11 @@ class DCUNet16(nn.Module):
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
 
+        # self.transformer = Transformer(args=args)
+
+        self.linear_q = nn.Linear(1, 128)
+        self.linear_k = nn.Linear(1, 128)
+        self.linear_v = nn.Linear(1, 128)
         # self.real_attn = MultiHeadAttention(args=args)
         #
         # self.imag_attn = MultiHeadAttention(args=args)
@@ -181,8 +188,8 @@ class DCUNet16(nn.Module):
         # self.real_attn = SpatialGate()
         # self.imag_attn = SpatialGate()
 
-        self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
-        self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
+        # self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
+        # self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
         self.downsample1 = EncoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=32, out_channels=32)
@@ -300,21 +307,22 @@ class DCUNet16(nn.Module):
         u7 = self.upsample7(c6)
         # print("   u7: ", u7.size()) # [1, 1, 1539, 214, 2]
 
+
         """
         mask selfattn
         """
-        real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
-        imag = u7[..., 1]
+        # real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
+        # imag = u7[..., 1]
 
-        target_real = target[..., 0]
-        target_imag = target[..., 1]
+        # target_real = target[..., 0]
+        # target_imag = target[..., 1]
 
         # print("input", real.size())
-        real_attn = self.real_transformer(real, target_real)
-        imag_attn = self.imag_transformer(imag, target_imag)
+        # real_attn = self.real_transformer(real, target_real)
+        # imag_attn = self.imag_transformer(imag, target_imag)
 
         # print("real", real_attn.size())
-        mask = torch.stack([real_attn, imag_attn], dim=-1)
+        # mask = torch.stack([real_attn, imag_attn], dim=-1)
         # print(mask.size())
         # print("mask", mask.size())
 
@@ -322,10 +330,26 @@ class DCUNet16(nn.Module):
         # display_spectrogram(m_db, "u7")
         # m2_db = librosa.amplitude_to_db(mask[..., 0].cpu().detach().numpy())
         # display_spectrogram(m2_db, "mask")
+        mask_real = u7[..., 0]
+        mask_imag = u7[..., 1]
+        target_real = target[..., 0]
+        target_imag = target[..., 1]
 
+        # target_real_gram = StyleLoss(target_real).cuda(self.args.gpu)
+        target_real_gram = self.gram_matrix(target_real).detach()
+        real_gram_matrix = self.gram_matrix(mask_real)
 
-        mask = mask * u7
-        output = x * mask
+        # target_imag_gram = StyleLoss(target_imag).cuda(self.args.gpu)
+        target_imag_gram = self.gram_matrix(target_imag).detach()
+        imag_gram_matrix = self.gram_matrix(mask_imag)
+
+        real_loss = F.mse_loss(real_gram_matrix, target_real_gram)
+        imag_loss = F.mse_loss(imag_gram_matrix, target_imag_gram)
+
+        gram_matrix = real_loss + imag_loss
+
+        # mask = mask * u7
+        output = x * u7
         # print("pass", output.size())
 
         # print("x", x)
@@ -350,17 +374,41 @@ class DCUNet16(nn.Module):
         if is_istft:
             # output = torch.squeeze(output, 1)
             # output = torch.istft(output, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
-            output = self.istft(output)
-            # print("   istft: ", output.size())
+            output = self.istft(output) # [batch ,1 , 165974]
             output = torch.squeeze(output, 1)
-            # print("   reshape: ", output.size())
+            # output = output.transpose(1, 2) # [batch, 165974, 1]
+
+            # print(output.size())
+
+            # target = self.istft(target)
+            # target = torch.squeeze(target, 1)
+            # target = target.transpose(1, 2)# [batch, 165974, 1]
+
+            # Q = self.linear_q(target) # [batch, 165974, 128]
+            # print(Q.size())
+            # K = self.linear_k(output)
+            # V = self.linear_v(output)
+
+            # attention = torch.bmm(Q, K.permute(0, 2, 1))
+
+
             # plt.figure(figsize=(15, 5))
             # plt.plot(output.squeeze(0).cpu().detach().numpy())
             # plt.title("denoising")
             # plt.show()
 
-        return output
+        return output, gram_matrix
 
+    def gram_matrix(self, y):
+        (b, ch, h, w) = y.size()
+        features = y.view(b * ch, h * w)
+        # print("1",features.size())
+        gram = torch.mm(features, features.t())
+        # print("2",gram.size())
+        # mm -> 행렬곱 (비슷한 것: element-wise/아다마르곱==> element끼리 곱)
+        gram = gram.div(b * ch * h * w)
+        # print("3",gram.size())
+        return gram
 
 def display_spectrogram(x, title):
     plt.figure(figsize=(15, 10))

@@ -51,9 +51,14 @@ parser.add_argument('--print-freq', type=int, default=1)
 parser.add_argument('--seed', type=int, default=None, help='random seed (default: None)')
 parser.add_argument('--resume', default=None, type=str, metavar='PATH', help="model_args.resume")
 parser.add_argument('--evaluate', '-e', default=False, action='store_true')
+
+# transformer
 parser.add_argument('--hidden_dim', type=int, default=512)
 parser.add_argument('--n_head', type=int, default=3)
 parser.add_argument('--dropout', default=0.1, type=float)
+parser.add_argument('--n-layer', default=6, type=int)
+parser.add_argument('--n-head', default=8, type=int)
+parser.add_argument('--feed-forward-dim', default=2048, type=int)
 
 # generate
 parser.add_argument('--generate', '-g', default=False, action='store_true')
@@ -273,18 +278,20 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         mixed = mixed.cuda(args.gpu) # noisy
         target = target.cuda(args.gpu)# Clean
 
-        pred = model(mixed, target=target) # denoisy
+        pred, gram_loss = model(mixed, target=target) # denoisy
         # print("mixed", mixed.size())
         # print("pred", pred.size())
         # print("target", target.size())
-        loss = criterion(args, n_fft, hop_length, mixed, pred, target)
+        sdr_loss = criterion(args, n_fft, hop_length, mixed, pred, target)
+
+        loss = sdr_loss + gram_loss
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         if i % args.print_freq == 0:
-            print(" Epoch [%d][%d/%d] | loss: %f" % (epoch+1, i, len(train_loader), loss))
+            print(" Epoch [%d][%d/%d] | Gram_loss: %f | sdr_loss: %f | Loss: %f" % (epoch+1, i, len(train_loader), gram_loss, sdr_loss, loss))
 
     scheduler.step()
     elapse = datetime.timedelta(seconds=time.time() - end)

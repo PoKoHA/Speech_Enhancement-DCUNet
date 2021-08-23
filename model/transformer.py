@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from model.sublayer import *
 from model.embedding import *
 from model.attention import *
-from model.VGGExtractor import VGGExtractor
+
 
 class EncoderLayer(nn.Module):
 
@@ -22,6 +22,7 @@ class EncoderLayer(nn.Module):
 
         return output, attn_map
 
+
 class Encoder(nn.Module):
 
     def __init__(self, args, d_model=512, input_dim=1539, d_ff=2048, n_layers=6, n_heads=8, dropout_p=0.3):
@@ -34,12 +35,11 @@ class Encoder(nn.Module):
         self.n_layers = n_layers
         self.n_heads = n_heads
 
-        self.conv = VGGExtractor(args=args, input_dim=input_dim)
         self.linear = nn.Linear(3392, d_model)  # README 참고 Linear 한번 해주고 나서 Encoder layer 실행
         init_weight(self.linear)
 
         self.dropout = nn.Dropout(dropout_p)
-        self.positional_encoding = PositionalEncoding(d_model)
+        self.positional_encoding = PositionalEncoding(d_model, max_len=args.max_len)
 
         self.layers = nn.ModuleList([EncoderLayer(d_model, n_heads, d_ff) for _ in range(n_layers)])
 
@@ -59,6 +59,7 @@ class Encoder(nn.Module):
             outputs, attn = layer(outputs, None)
         # print("En out:", outputs.size())
         return outputs, attn
+
 
 ############################################
 class DecoderLayer(nn.Module):

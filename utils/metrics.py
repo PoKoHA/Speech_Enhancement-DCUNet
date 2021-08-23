@@ -18,9 +18,10 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
             target = target.cuda(args.gpu)
 
             # test loss 구하기WW
-            pred_x = model(mixed, target=target) # time domain
-            loss = criterion(args, N_FFT, HOP_LENGTH, mixed, pred_x, target)
+            pred_x, gram_loss = model(mixed, target=target) # time domain
+            sdr_loss = criterion(args, N_FFT, HOP_LENGTH, mixed, pred_x, target)
             # print(pred_x)
+            loss = gram_loss + sdr_loss
             total_loss += loss.item()
 
             # PESQ score 구하기

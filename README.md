@@ -1,4 +1,9 @@
-**TEST_04 Branch: Output(Denoising된)을 ISTFT 걸친 후 Time-domain(shape:[batch, channel=1, SampleRate * TIme])에서 Target을 Decoder Input으로 해서 CrossAttention 실행**
+**TEST_04 Branch: ~~Output(Denoising된)을 ISTFT 걸친 후 Time-domain(shape:[batch, channel=1, SampleRate * TIme])에서 Target을 Decoder Input으로 해서 CrossAttention 실행~~(메모리를 너무
+많이 잡아먹음)**
+
+**- Target의 Spectrogram들도 형태를 알아 볼 수 있는 Style이 있다고 가정하에 Style Transfer에서 사용하였던 Gram Matrix
+를 사용함 Mask(또는 Denoising된 Output)의 Gram Matrix와 Target Gram Matrix를 MSELoss를 써서
+wSDR_loss에 더해주었음**
 
 - Result folder에 Spectrogram 비교 첨부 
 

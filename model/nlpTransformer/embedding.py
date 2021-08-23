@@ -28,26 +28,18 @@ class PositionalEncoding(nn.Module):
         # todo input.size(1) 아니면 length
         return self.PE[:, :length]
 
-# Embedding은 Spectrogram 상에서 쓸일이 없음
-class Embedding(nn.Module):
-    """
-    Decoder Input 은 음성이 아닌 Transcript 이니까 그 때 사용
-    """
-    def __init__(self, num_embeddings, d_model=512):
-        super(Embedding, self).__init__()
-        self.sqrt_dim = math.sqrt(d_model)
-        self.embedding = nn.Embedding(num_embeddings, d_model)
-
-    def forward(self, inputs):
-        # Transformer Paper) we multiply those weights by sqrt(d_model)
-        return self.embedding(inputs) * self.sqrt_dim
 
 if __name__ == "__main__":
     a = torch.randn(2, 165974).cuda()
-    b = PositionalEncoding(max_len=165974, d_model=512).cuda()
-    d = b(a.size(1))
-    print("a", d.size())
+    b = PositionalEncoding(max_len=165975, d_model=512).cuda()
+    print(b(a.size(1)).size())
+    a = a.unsqueeze(dim=-1)
+    print("a", a.size())
+    c = nn.Linear(1, 512).cuda()
+    print(c(a).size())
+    print(c.weight.transpose(0,1).size())
 
-    f = torch.LongTensor(2, 165974).cuda()
-    e = Embedding(num_embeddings=165975).cuda()
-    print(e(f))
+    # b = create_position_vector(a).cuda()
+    # print(b.size())
+    # c = create_position_encoding(165974, 512).cuda()
+    # print(c.size())
