@@ -1,8 +1,6 @@
 **TEST_02 Branch: Mask나 mixed Input의 Spectrogram shape는 [batch, channel=1, freq, time, 실수 허수],
 여기서 Time을 Length로 두고 freq을 Dim로 두어 Real과 Imag끼리 MultiHeadAttention 수행**
-
-
-- Result folder에 Spectrogram 비교 첨부 
+>>결과:pesq=3.0115 GPU Memory는 더 잡아먹는데(batch 16) 결과는 더 안좋아졌음
 
 > 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여
 > 좋은 결과를 만들어냄
