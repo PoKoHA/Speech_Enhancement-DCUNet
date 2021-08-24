@@ -333,8 +333,8 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         pred, pred_spec = model(mixed, target=target) # denoisy
 
         # Discriminator_Real
-        print("GT", target.size())
-        print("pred", pred_spec.size())
+        # print("GT", target.size())
+        # print("pred", pred_spec.size())
         optimizer_D_real.zero_grad()
         dis_fake_loss = criterion_D(D_real(pred_spec[..., 0].detach()), fake)
         dis_real_loss = criterion_D(D_real(target[..., 0]), valid)
@@ -381,7 +381,8 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
 def validate(dataloader, model, criterion, n_fft, hop_length, args,
              D_real, D_imag, criterion_D):
     model.eval()
-    D.eval()
+    D_imag.eval()
+    D_real.eval()
     # loss와 score를 동시에 구하는 함수로 대체하였음
     score, loss_avg = pesq_score(model, dataloader, criterion, args, n_fft, hop_length,
                                  D_real, D_imag, criterion_D)

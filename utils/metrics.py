@@ -2,7 +2,9 @@ from tqdm import tqdm
 import numpy as np
 
 import torch
+from torch.autograd import Variable
 import torchaudio
+
 from pypesq import pesq
 from model.ISTFT import ISTFT
 
@@ -25,8 +27,8 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
             mixed = mixed.cuda(args.gpu)
             target = target.cuda(args.gpu)
 
-            valid = Variable(Tensor(np.ones((mixed.size(0), *(1, 19, 107)))), requires_grad=False)
-            fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 19, 107)))), requires_grad=False)
+            valid = Variable(Tensor(np.ones((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
+            fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
 
             # test loss 구하기WW
             pred_x, pred_spec = model(mixed, target=target) # time domain
