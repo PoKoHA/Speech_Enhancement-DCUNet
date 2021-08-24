@@ -170,7 +170,6 @@ class DCUNet16(nn.Module):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
-
         # self.transformer = Transformer(args=args)
 
         self.linear_q = nn.Linear(1, 128)
@@ -212,7 +211,7 @@ class DCUNet16(nn.Module):
                                       output_padding=(0, 1), bias=True, last=True)
 
 
-    def forward(self, x, target,is_istft=True):
+    def forward(self, x, target, is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
@@ -307,10 +306,6 @@ class DCUNet16(nn.Module):
         u7 = self.upsample7(c6)
         # print("   u7: ", u7.size()) # [1, 1, 1539, 214, 2]
 
-
-        """
-        mask selfattn
-        """
         # real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
         # imag = u7[..., 1]
 
@@ -330,26 +325,8 @@ class DCUNet16(nn.Module):
         # display_spectrogram(m_db, "u7")
         # m2_db = librosa.amplitude_to_db(mask[..., 0].cpu().detach().numpy())
         # display_spectrogram(m2_db, "mask")
-        mask_real = u7[..., 0]
-        mask_imag = u7[..., 1]
-        target_real = target[..., 0]
-        target_imag = target[..., 1]
-
-        # target_real_gram = StyleLoss(target_real).cuda(self.args.gpu)
-        target_real_gram = self.gram_matrix(target_real).detach()
-        real_gram_matrix = self.gram_matrix(mask_real)
-
-        # target_imag_gram = StyleLoss(target_imag).cuda(self.args.gpu)
-        target_imag_gram = self.gram_matrix(target_imag).detach()
-        imag_gram_matrix = self.gram_matrix(mask_imag)
-
-        real_loss = F.mse_loss(real_gram_matrix, target_real_gram)
-        imag_loss = F.mse_loss(imag_gram_matrix, target_imag_gram)
-
-        gram_matrix = real_loss + imag_loss
-
         # mask = mask * u7
-        output = x * u7
+        output_spec = x * u7
         # print("pass", output.size())
 
         # print("x", x)
@@ -374,7 +351,7 @@ class DCUNet16(nn.Module):
         if is_istft:
             # output = torch.squeeze(output, 1)
             # output = torch.istft(output, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
-            output = self.istft(output) # [batch ,1 , 165974]
+            output = self.istft(output_spec) # [batch ,1 , 165974]
             output = torch.squeeze(output, 1)
             # output = output.transpose(1, 2) # [batch, 165974, 1]
 
@@ -397,7 +374,7 @@ class DCUNet16(nn.Module):
             # plt.title("denoising")
             # plt.show()
 
-        return output, gram_matrix
+        return output, output_spec
 
     def gram_matrix(self, y):
         (b, ch, h, w) = y.size()
