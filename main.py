@@ -217,7 +217,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Resume
     if args.resume:
-        assert args.resume_D is not None, "resume-D도 설정"
+        assert args.resume_D_R and args.resume_D_I is not None, "resume-D도 설정"
         model.load_state_dict(torch.load(args.resume, map_location="cuda:0"))
         D_real.load_state_dict(torch.load(args.resume_D_R, map_location="cuda:0"))
         D_imag.load_state_dict(torch.load(args.resume_D_I, map_location="cuda:0"))
@@ -309,7 +309,8 @@ def main_worker(gpu, ngpus_per_node, args):
         if best_PESQ < PESQ: # 현재 PESQ 더 클시
             print("Found better validated model")
             torch.save(model.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
-            torch.save(D.state_dict(), "saved_models/D_%d.pth" % (epoch + 1))
+            torch.save(D_real.state_dict(), "saved_models/D_R_%d.pth" % (epoch + 1))
+            torch.save(D_imag.state_dict(), "saved_models/D_I_%d.pth" % (epoch + 1))
             best_PESQ = PESQ
 
 

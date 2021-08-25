@@ -1,5 +1,6 @@
-**TEST_5 Branch: Discriminative를 두어서 Target에 Real을 Output에 Fake라고 선별하도록 만들고 이로 인해 Unet은 더욱
-Real에 가까운 값을 만들 수 있게 Mask를 만들게 될 것임을 가정**
+**TEST_5 Branch: Self-Attn Discriminative를 두어서 Target에 Real을 Output에 Fake라고 선별하도록 만들고 이로 인해 Unet은 더욱
+Real에 가까운 값을 만들 수 있게 Mask를 만들게 될 것임을 가정
+그리고 _마스크_ 에도 SelfATTn적용**
 
 **Discriminator를 Real, Imag 2개를 생성하고 Target Real, Pred Real 식으로 input으로 넣어줌 그리고 MSELoss**
 
