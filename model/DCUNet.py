@@ -14,6 +14,7 @@ from utils.utils import display_feature
 
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
+from model.attention import Self_Attn
 
 class EncoderBlock(nn.Module):
 
@@ -166,9 +167,6 @@ class DCUNet16(nn.Module):
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
         # self.transformer = Transformer(args=args)
 
-        self.linear_q = nn.Linear(1, 128)
-        self.linear_k = nn.Linear(1, 128)
-        self.linear_v = nn.Linear(1, 128)
         # self.real_attn = MultiHeadAttention(args=args)
         #
         # self.imag_attn = MultiHeadAttention(args=args)
@@ -192,6 +190,11 @@ class DCUNet16(nn.Module):
         self.downsample5 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
         self.downsample6 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
         self.downsample7 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
+
+        self.attn_1 = Self_Attn(in_channels=64) # Real
+        self.attn_2 = Self_Attn(in_channels=64) # Imag
+        self.attn_3 = Self_Attn(in_channels=64) # Imag
+        self.attn_4 = Self_Attn(in_channels=64) # Imag
 
         # Decoder(Upsampling)
         self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
@@ -244,9 +247,14 @@ class DCUNet16(nn.Module):
         # display_feature(d7[..., 1], "Encoder_8_imag")
         # print("   d7: ", d7.size())
 
+        # d7_R_attn, R_map = self.attn_1(d7[..., 0])
+        # d7_I_attn, I_amp = self.attn_2(d7[..., 1])
+        # d7_attn = torch.stack([d7_R_attn, d7_I_attn], dim=-1)
         # print("   --[Decoder]-- ")
         # bridge 첫번째 Decoder에 skip connection X
         u0 = self.upsample0(d7)
+
+        # u0 = torch.stack([u0_R_attn, u0_I_attn], dim=-1)
         # display_feature(u0[..., 0], "Decoder_1_real")
         # display_feature(u0[..., 1], "Decoder_1_imag")
 

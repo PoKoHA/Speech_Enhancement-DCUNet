@@ -44,7 +44,7 @@ class Self_Attn(nn.Module):
 
 
 if __name__ == "__main__":
-    attn = Self_Attn(in_channels=1).cuda()
-    test = torch.randn(2, 1, 770, 107).cuda()
+    attn = Self_Attn(in_channels=64).cuda()
+    test = torch.randn(2, 64, 193, 54).cuda()
 
     print(attn(test)[0].size())

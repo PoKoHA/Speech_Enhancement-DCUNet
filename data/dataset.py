@@ -57,7 +57,7 @@ class SpeechDataset(Dataset):
         x_clean = self.load_sample(self.clean_files[idx])
         # x_clean = self.load_sample("test/10_GT.wav")
         x_noisy = self.load_sample(self.noisy_files[idx])
-        # x_noisy = self.load_sample("test/10.wav")
+        # x_noisy = self.load_sample("p286_137.wav")
 
         # print(self.clean_files[idx], x_clean.size())
         # print(self.noisy_files[idx], x_noisy.size())
@@ -88,9 +88,9 @@ class SpeechDataset(Dataset):
         imag = x_noisy_stft[:, :, :, 1]
         imag_gt = x_clean_stft[:, :, :, 1]
         # print(real.size())
-        real_db = librosa.amplitude_to_db(real)
+        # real_db = librosa.amplitude_to_db(real)
         real_gt_db = librosa.amplitude_to_db(real_gt)
-        #display_spectrogram(real_db, "Real")
+        # display_spectrogram(real_db, "Real")
         #display_spectrogram(real_gt_db, "Real_GT")
 
         imag_db = librosa.amplitude_to_db(imag)
@@ -111,7 +111,7 @@ class SpeechDataset(Dataset):
 
         mag_db = librosa.amplitude_to_db(mag)
         mag_gt_db = librosa.amplitude_to_db(mag_gt)
-        #display_spectrogram(mag_db, "mag")
+        # display_spectrogram(mag_db, "mag")
         #display_spectrogram(mag_gt_db, "mag_GT")
 
         phase = torch.atan2(imag, real)
