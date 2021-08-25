@@ -14,12 +14,6 @@ from utils.utils import display_feature
 
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
-from model.attention import *
-from model.embedding import *
-from model.sublayer import *
-from model.transformer import SpeechTransformer
-from model.nlpTransformer.transformer import Transformer
-from model.gram_matrix import gram_matrix
 
 class EncoderBlock(nn.Module):
 
@@ -305,17 +299,6 @@ class DCUNet16(nn.Module):
 
         u7 = self.upsample7(c6)
         # print("   u7: ", u7.size()) # [1, 1, 1539, 214, 2]
-
-        # real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
-        # imag = u7[..., 1]
-
-        # target_real = target[..., 0]
-        # target_imag = target[..., 1]
-
-        # print("input", real.size())
-        # real_attn = self.real_transformer(real, target_real)
-        # imag_attn = self.imag_transformer(imag, target_imag)
-
         # print("real", real_attn.size())
         # mask = torch.stack([real_attn, imag_attn], dim=-1)
         # print(mask.size())
