@@ -315,6 +315,7 @@ class DCUNet16(nn.Module):
 
         # print("real", real_attn.size())
         mask = torch.stack([real_attn, imag_attn], dim=-1)
+        mask = torch.unsqueeze(mask, dim=1)
         # print(mask.size())
         # print("mask", mask.size())
 
@@ -325,7 +326,7 @@ class DCUNet16(nn.Module):
 
 
         mask = mask * u7
-        output = x * mask
+        output_spec = x * mask
         # print("pass", output.size())
 
         # print("x", x)
@@ -350,7 +351,7 @@ class DCUNet16(nn.Module):
         if is_istft:
             # output = torch.squeeze(output, 1)
             # output = torch.istft(output, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
-            output = self.istft(output)
+            output = self.istft(output_spec)
             # print("   istft: ", output.size())
             output = torch.squeeze(output, 1)
             # print("   reshape: ", output.size())
@@ -359,7 +360,7 @@ class DCUNet16(nn.Module):
             # plt.title("denoising")
             # plt.show()
 
-        return output
+        return output, output_spec
 
 
 def display_spectrogram(x, title):

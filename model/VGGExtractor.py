@@ -75,11 +75,12 @@ class VGGExtractor(nn.Module):
     def get_output_dim(self):
         return (self.input_dim - 1) << 5 if self.input_dim % 2 else self.input_dim << 5
 
-    def forward(self, inputs,):
+    def forward(self, inputs):
         # [batch, channel=1, freq=1539, time=214]
-        print("C", inputs.transpose(2,3).size())
+        # print(inputs)
+        # print("C", inputs.transpose(2,3).size())
         outputs = self.conv(inputs.transpose(2, 3)) # [batch, cnannel, 214t, 1539freq]
-        print("g", outputs.size())
+        # print("g", outputs.size())
         batch_size, channels, dimension, seq_lengths = outputs.size()
         outputs = outputs.permute(0, 3, 1, 2) # [batch, freq, channel,time]
         outputs = outputs.view(batch_size, seq_lengths, channels * dimension)

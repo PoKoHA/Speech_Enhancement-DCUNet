@@ -1,6 +1,9 @@
 **TEST_03 Branch: ASR Transformer그대로 이용 / AST Transformer는 Decoder Input이 Text이므로 Encoder 형식과 똑같이만 되도록 수정하였음**
 
-- Result folder에 Spectrogram 비교 첨부 
+**- 추가적으로 좋은결과가 나오기에 Self Attn한 Discriminator를 도입해보았다.
+그리고 SpectralNorm을 사용할지 안할지 여부를 아직 미결정 우선 사용안하고 돌림**
+
+- Result folder에 Spectrogram 비교 첨부
 
 > 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여
 > 좋은 결과를 만들어냄

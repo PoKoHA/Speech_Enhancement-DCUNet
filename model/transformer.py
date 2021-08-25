@@ -166,3 +166,9 @@ class SpeechTransformer(nn.Module):
         decoder_outputs, target_self_attn, cross_attn = self.decoder(target, encoder_outputs)
 
         return decoder_outputs
+
+if __name__ == "__main__":
+    a = torch.randn(1, 1, 1539, 214).cuda()
+    b = torch.randn(1, 1, 1539, 214).cuda()
+    c = SpeechTransformer(args="GOOD").cuda()
+    print(c(a, b).size())
