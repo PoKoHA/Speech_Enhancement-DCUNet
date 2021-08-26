@@ -13,7 +13,7 @@ import torch.nn as nn
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
 
-from utils import display_feature
+from utils.utils import display_feature
 
 class EncoderBlock(nn.Module):
 

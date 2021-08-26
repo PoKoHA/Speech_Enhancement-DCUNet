@@ -54,10 +54,10 @@ class SpeechDataset(Dataset):
         return output
 
     def __getitem__(self, idx):
-        # x_clean = self.load_sample(self.clean_files[idx])
-        x_clean = self.load_sample("test/10_GT.wav")
-        # x_noisy = self.load_sample(self.noisy_files[idx])
-        x_noisy = self.load_sample("test/10.wav")
+        x_clean = self.load_sample(self.clean_files[idx])
+        # x_clean = self.load_sample("test/10_GT.wav")
+        x_noisy = self.load_sample(self.noisy_files[idx])
+        # x_noisy = self.load_sample("test/10.wav")
 
         # print(self.clean_files[idx], x_clean.size())
         # print(self.noisy_files[idx], x_noisy.size())
