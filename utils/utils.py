@@ -12,7 +12,9 @@ from model.ISTFT import ISTFT
 from data.STFT import STFT
 
 def generate_wav(model, mixed, max_len, n_fft, hop_length, args):
+
     model.eval()
+
     stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True).cuda(args.gpu)
     file_list = os.listdir(args.denoising_file)
     for idx in range(len(file_list)):
@@ -39,7 +41,7 @@ def generate_wav(model, mixed, max_len, n_fft, hop_length, args):
         # print(input_stft.size())
         input_stft = input_stft.unsqueeze(0) # batch
         with torch.no_grad():
-            pred = model(input_stft)
+            pred, _ = model(input_stft)
 
         # plt.figure(figsize=(15,5))
         # plt.plot(pred.squeeze(0)[-current_len:].cpu().numpy())

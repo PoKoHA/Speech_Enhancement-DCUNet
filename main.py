@@ -224,6 +224,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # 만약 Dataparallel 으로 저장했을 시 이 코드 사용
         # stat_dict = torch.load(args.resume, map_location="cuda:0")
+        # stat_dict_R = torch.load(args.resume_D_R, map_location="cuda:0")
+        # stat_dict_I = torch.load(args.resume_D_I, map_location="cuda:0")
         #
         # new_state_dict = OrderedDict()
         # for k, v in stat_dict.items():
@@ -331,7 +333,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         valid = Variable(Tensor(np.ones((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
         fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
 
-        pred, pred_spec = model(mixed, target=target) # denoisy
+        pred, pred_spec = model(mixed) # denoisy
 
         # Discriminator_Real
         # print("GT", target.size())

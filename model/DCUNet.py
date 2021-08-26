@@ -191,10 +191,14 @@ class DCUNet16(nn.Module):
         self.downsample6 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
         self.downsample7 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
 
-        self.attn_1 = Self_Attn(in_channels=64) # Real
-        self.attn_2 = Self_Attn(in_channels=64) # Imag
-        self.attn_3 = Self_Attn(in_channels=64) # Imag
-        self.attn_4 = Self_Attn(in_channels=64) # Imag
+        # self.attn_1 = Self_Attn(in_channels=64) # Real
+        # self.attn_2 = Self_Attn(in_channels=64) # Imag
+        # self.attn_3 = Self_Attn(in_channels=64) # Imag
+        # self.attn_4 = Self_Attn(in_channels=64) # Imag
+
+        self.linear_q = nn.Linear(1, 128)
+        self.linear_k = nn.Linear(1, 128)
+        self.linear_v = nn.Linear(1, 128)
 
         # Decoder(Upsampling)
         self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
@@ -208,7 +212,7 @@ class DCUNet16(nn.Module):
                                       output_padding=(0, 1), bias=True, last=True)
 
 
-    def forward(self, x, target, is_istft=True):
+    def forward(self, x, is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
