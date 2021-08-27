@@ -14,7 +14,7 @@ from utils.utils import display_feature
 
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
-from model.attention import Self_Attn
+from model.attention import CCBAM
 
 class EncoderBlock(nn.Module):
 
@@ -165,40 +165,24 @@ class DCUNet16(nn.Module):
         self.n_fft = n_fft
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
-        # self.transformer = Transformer(args=args)
 
-        # self.real_attn = MultiHeadAttention(args=args)
-        #
-        # self.imag_attn = MultiHeadAttention(args=args)
-        #
-        # self.target_real_attn = MultiHeadAttention(args=args)
-        # self.target_imag_attn = MultiHeadAttention(args=args)
-        #
-        # self.real_cross_attn = MultiHeadAttention(args=args)
-        # self.target_cross_attn = MultiHeadAttention(args=args)
-        # self.real_attn = SpatialGate()
-        # self.imag_attn = SpatialGate()
-
-        # self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
-        # self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
+        self.ccbam_0 = CCBAM(gate_channels=32, no_spatial=True)
         self.downsample1 = EncoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=32, out_channels=32)
+        self.ccbam_1 = CCBAM(gate_channels=32, no_spatial=True)
         self.downsample2 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=32, out_channels=64)
+        self.ccbam_2 = CCBAM(gate_channels=64, no_spatial=True)
         self.downsample3 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_3 = CCBAM(gate_channels=64, no_spatial=True)
         self.downsample4 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_4 = CCBAM(gate_channels=64, no_spatial=True)
         self.downsample5 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_5 = CCBAM(gate_channels=64, no_spatial=True)
         self.downsample6 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_6 = CCBAM(gate_channels=64, no_spatial=True)
         self.downsample7 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
-
-        # self.attn_1 = Self_Attn(in_channels=64) # Real
-        # self.attn_2 = Self_Attn(in_channels=64) # Imag
-        # self.attn_3 = Self_Attn(in_channels=64) # Imag
-        # self.attn_4 = Self_Attn(in_channels=64) # Imag
-
-        self.linear_q = nn.Linear(1, 128)
-        self.linear_k = nn.Linear(1, 128)
-        self.linear_v = nn.Linear(1, 128)
+        self.ccbam_7 = CCBAM(gate_channels=64, no_spatial=True)
 
         # Decoder(Upsampling)
         self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
@@ -219,34 +203,42 @@ class DCUNet16(nn.Module):
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
         d0 = self.downsample0(x)
+        d0_attn = self.ccbam_0(d0)
         # display_feature(d0[..., 0], "Encoder_1_real")
         # display_feature(d0[..., 1], "Encoder_1_imag")
         # print("   d0: ", d0.size())
         d1 = self.downsample1(d0)
+        d1_attn = self.ccbam_1(d1)
         # display_feature(d1[..., 0], "Encoder_2_real")
         # display_feature(d1[..., 1], "Encoder_2_imag")
         # print("   d1: ", d1.size())
         d2 = self.downsample2(d1)
+        d2_attn = self.ccbam_2(d2)
         # display_feature(d2[..., 0], "Encoder_3_real")
         # display_feature(d2[..., 1], "Encoder_3_imag")
         # print("   d2: ", d2.size())
         d3 = self.downsample3(d2)
+        d3_attn = self.ccbam_3(d3)
         # display_feature(d3[..., 0], "Encoder_4_real")
         # display_feature(d3[..., 1], "Encoder_4_imag")
         # print("   d3: ", d3.size())
         d4 = self.downsample4(d3)
+        d4_attn = self.ccbam_4(d4)
         # display_feature(d4[..., 0], "Encoder_5_real")
         # display_feature(d4[..., 1], "Encoder_5_imag")
         # print("   d4: ", d4.size())
         d5 = self.downsample5(d4)
+        d5_attn = self.ccbam_5(d5)
         # display_feature(d5[..., 0], "Encoder_6_real")
         # display_feature(d5[..., 1], "Encoder_6_imag")
         # print("   d5: ", d5.size())
         d6 = self.downsample6(d5)
+        d6_attn = self.ccbam_6(d6)
         # display_feature(d6[..., 0], "Encoder_7_real")
         # display_feature(d6[..., 1], "Encoder_7_imag")
         # print("   d6: ", d6.size())
         d7 = self.downsample7(d6)
+        d7_attn = self.ccbam_7(d7)
         # display_feature(d7[..., 0], "Encoder_8_real")
         # display_feature(d7[..., 1], "Encoder_8_imag")
         # print("   d7: ", d7.size())
@@ -263,49 +255,49 @@ class DCUNet16(nn.Module):
         # display_feature(u0[..., 1], "Decoder_1_imag")
 
         # skip-connection
-        c0 = torch.cat((u0, d6), dim=1)
+        c0 = torch.cat((u0, d6_attn), dim=1)
         # print("   u0: ", u0.size())
         # print("   concat(u0,d6): ", c0.size())
 
         u1 = self.upsample1(c0)
         # display_feature(u1[..., 0], "Decoder_2_real")
         # display_feature(u1[..., 1], "Decoder_2_imag")
-        c1 = torch.cat((u1, d5), dim=1)
+        c1 = torch.cat((u1, d5_attn), dim=1)
         # print("   u1: ", u1.size())
         # print("   concat(u1,d5): ", c1.size())
 
         u2 = self.upsample2(c1)
         # display_feature(u2[..., 0], "Decoder_3_real")
         # display_feature(u2[..., 1], "Decoder_3_imag")
-        c2 = torch.cat((u2, d4), dim=1)
+        c2 = torch.cat((u2, d4_attn), dim=1)
         # print("   u2: ", u2.size())
         # print("   concat(u2,d4): ", c2.size())
 
         u3 = self.upsample3(c2)
         # display_feature(u3[..., 0], "Decoder_4_real")
         # display_feature(u3[..., 1], "Decoder_4_imag")
-        c3 = torch.cat((u3, d3), dim=1)
+        c3 = torch.cat((u3, d3_attn), dim=1)
         # print("   u3: ", u3.size())
         # print("   concat(u3,d3): ", c3.size())
 
         u4 = self.upsample4(c3)
         # display_feature(u4[..., 0], "Decoder_5_real")
         # display_feature(u4[..., 1], "Decoder_5_imag")
-        c4 = torch.cat((u4, d2), dim=1)
+        c4 = torch.cat((u4, d2_attn), dim=1)
         # print("   u4: ", u4.size())
         # print("   concat(u4,d2): ", c4.size())
 
         u5 = self.upsample5(c4)
         # display_feature(u5[..., 0], "Decoder_6_real")
         # display_feature(u5[..., 1], "Decoder_6_imag")
-        c5 = torch.cat((u5, d1), dim=1)
+        c5 = torch.cat((u5, d1_attn), dim=1)
         # print("   u5: ", u5.size())
         # print("   concat(u5,d1): ", c5.size())
 
         u6 = self.upsample6(c5)
         # display_feature(u6[..., 0], "Decoder_7_real")
         # display_feature(u6[..., 1], "Decoder_7_imag")
-        c6 = torch.cat((u6, d0), dim=1)
+        c6 = torch.cat((u6, d0_attn), dim=1)
         # print("   u6: ", u6.size())
         # print("   concat(u6,d0): ", c6.size())
 

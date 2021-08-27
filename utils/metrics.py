@@ -10,12 +10,9 @@ from model.ISTFT import ISTFT
 
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
-def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
-               D_real, D_imag, criterion_D):
+def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
 
     model.eval()
-    D_real.eval()
-    D_imag.eval()
 
     test_pesq = 0.
     total_loss = 0
@@ -27,28 +24,12 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
             mixed = mixed.cuda(args.gpu)
             target = target.cuda(args.gpu)
 
-            valid = Variable(Tensor(np.ones((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
-            fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
-
             # test loss 구하기WW
             pred_x, pred_spec = model(mixed) # time domain
 
-            # Real Discriminator
-            dis_fake_loss = criterion_D(D_real(pred_spec[..., 0].detach()), fake)
-            dis_real_loss = criterion_D(D_real(target[..., 0]), valid)
-
-            loss_D_R = (dis_real_loss + dis_fake_loss) / 2
-
-            # Imag Discriminator
-            dis_fake_loss = criterion_D(D_imag(pred_spec[..., 1].detach()), fake)
-            dis_real_loss = criterion_D(D_imag(target[..., 1]), valid)
-
-            loss_D_I = (dis_real_loss + dis_fake_loss) / 2
-
-            # SDR
             sdr_loss = criterion(args, N_FFT, HOP_LENGTH, mixed, pred_x, target)
             # print(pred_x)
-            loss = sdr_loss + loss_D_I + loss_D_R
+            loss = sdr_loss
             total_loss += loss.item()
 
             # PESQ score 구하기

@@ -1,10 +1,6 @@
-**TEST_5 Branch: Self-Attn Discriminative를 두어서 Target에 Real을 Output에 Fake라고 선별하도록 만들고 이로 인해 Unet은 더욱
-Real에 가까운 값을 만들 수 있게 Mask를 만들게 될 것임을 가정
-그리고 _마스크_ 에도 SelfATTn적용**
-
-**추가적으로 Encoder 마지막에도 Self_ATTN 적용**
-
-**Discriminator를 Real, Imag 2개를 생성하고 Target Real, Pred Real 식으로 input으로 넣어줌 그리고 MSELoss**
+**TEST_6 Branch: CBAM(Convolutional Block Attentio Module)을 사용
+각 Channel 별로 Attn을 해주고 또 Spatial하게 Attn해준다음에 Input하고 더해주고 그 값을 Skip Connection을 통해
+Decoder로 전달해주는 구조**
 
 - Result folder에 Spectrogram 비교 첨부 
 
