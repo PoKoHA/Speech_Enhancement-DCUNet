@@ -31,7 +31,7 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
             fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
 
             # test loss 구하기WW
-            pred_x, pred_spec = model(mixed, target=target) # time domain
+            pred_x, pred_spec = model(mixed) # time domain
 
             # Real Discriminator
             dis_fake_loss = criterion_D(D_real(pred_spec[..., 0].detach()), fake)
