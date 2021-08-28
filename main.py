@@ -181,7 +181,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Resume
     if args.resume:
-        assert args.resume_D_R and args.resume_D_I is not None, "resume-D도 설정"
         model.load_state_dict(torch.load(args.resume, map_location="cuda:0"))
         # 만약 Dataparallel 으로 저장했을 시 이 코드 사용
         # stat_dict = torch.load(args.resume, map_location="cuda:0")
@@ -267,8 +266,8 @@ def main_worker(gpu, ngpus_per_node, args):
         if best_PESQ < PESQ: # 현재 PESQ 더 클시
             print("Found better validated model")
             torch.save(model.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
-            torch.save(D_real.state_dict(), "saved_models/D_R_%d.pth" % (epoch + 1))
-            torch.save(D_imag.state_dict(), "saved_models/D_I_%d.pth" % (epoch + 1))
+            # torch.save(D_real.state_dict(), "saved_models/D_R_%d.pth" % (epoch + 1))
+            # torch.save(D_imag.state_dict(), "saved_models/D_I_%d.pth" % (epoch + 1))
             best_PESQ = PESQ
 
 
