@@ -4,26 +4,40 @@
 - **ASR Transformer**에 사용하였던 ScheduleAdam을 사용
 - Self Attention 적용한 **Discriminator** 적용
 - Loss를 wSDR이 아닌 **SI-SNR**로 바꿈(DCCRN꺼 그대로)
-> `python main.py --gpu(or MultiGPU) --batch-size ** --warm-steps (batch에 따라 유연성있게) --epochs 40
-> --decay_epoch 20`
 
-## DCUnet
 
- 1. Noisy Spectrogram -> Clean Spectrogram(Mask)
+## Architecture
 
 ![1](https://user-images.githubusercontent.com/76771847/127819187-c25d1db2-0504-4c60-a0e8-2422d658e3d6.png)
+![cbam](https://user-images.githubusercontent.com/76771847/131243269-834125a7-5088-455d-8380-b4c8a385570f.png)
+**- DCUnet(16block)을 Base로 각 SKip-Connection 마다 CBAM(Convolutional Block Attention Module)적용**
 
- 2. Tanh을 사용했을 경우 Bounded Region
+**: Transformer에서 쓰는 Self Attention을 쓰기에는 [batch, channel=1, freq=1539, time=213]이 너무 크기 때문에 / CBAM
+을 사용하여 어떤 Channel(What) 과 Spatial(Where)을 집중 할 것인지를 찾음**
 
-![2](https://user-images.githubusercontent.com/76771847/127819335-b0467ac3-66a8-4d59-bb73-20be048ddf8f.png)
 
- 3. Real-Img 따로 conv 수행 
+![ASR-transformer](https://user-images.githubusercontent.com/76771847/131243336-3a50a027-1a40-446b-a2b5-19f95c7104c0.png)
 
-![3](https://user-images.githubusercontent.com/76771847/127819646-5d76de1b-024d-4184-a4bd-3e283522ac6a.png)
+**- DCUnet에서 나온 Mask 뒷단에다가 ASR-Transformer를 붙힘(Decoder Input = Target Spectrogram)**
 
- 4. Architecture(Unet)
- 
-![4](https://user-images.githubusercontent.com/76771847/127819727-7e7c7b8e-b915-41eb-b9d3-817d215c7bda.png)
+**: Mask와 Target의 Spectrogram을 Encoder, Decoder Input으로 받아서 서로 MultiHead Cross Attention 적용**
+
+**(그림과 다르게 Decoder도 Encoder와 같은 Spectrogram이므로 VGGExtractor 사용)**
+
+
+![Discriminator](https://user-images.githubusercontent.com/76771847/131243460-48f69bbd-2bb9-4155-9336-bc7e2ba34fbc.png)
+![sagan](https://user-images.githubusercontent.com/76771847/131243461-05a65c12-7701-47fe-8b7a-ef40484a9f9c.png)
+
+**- Denoising된 Spectrogram을 GAN 관점으로 보면 *Fake Image*로 볼 수있다고
+생각하여 Self-Attention이 적용된 Discriminator를 적용**
+
+**:https://openaccess.thecvf.com/content_cvpr_2017_workshops/w12/papers/Divakar_Image_Denoising_via_CVPR_2017_paper.pdf**
+
+
+![loss](https://user-images.githubusercontent.com/76771847/129316595-bad11735-78e6-45e1-8fa5-fe67e422423f.png)
+
+**- DCUnet에서는 원래 wSDR을 사용하였지만 대중적으로 많이 쓰고 있다고 하는 SI-SNR
+Loss를 사용**
 
 ## Reference
 
@@ -46,32 +60,21 @@ Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19f
 
 **Training**
 
-> `python main.py --epochs 100 --gpu 0 --batch-size 4
---clean-train-dir 'PATH' --noisy-train-dir 'PATH' --noisy-valid-dir 'PATH --clean-valid-dir 'PATH --sample-rate (DATA)`
-
-**Evaluate**
-> `python main.py -e(or --evaluate) --resume (PATH) --noisy-test-dir (PATH) --clean-test-dir (PATH)`
-
-**Generate**
-> `python main.py -g(or --generate) --resume (PATH) --denoising-file (file)`
+> `python main.py --gpu(or MultiGPU) --batch-size ** --warm-steps (batch에 따라 유연성있게) --epochs 40
+> --decay_epoch 20``
 
 ## Result
 
-- **PESQ: 3.1231 기록**
+- **(Base DCUnet)PESQ: 3.1231 기록**
 
 | Mix | predict | GT |
 |---|---|---|
 | [mixture.wav](./example/mixed.wav?raw=true) |  [predict.wav](./example/predict.wav?raw=true)  |  [GT.wav](./example/GT.wav?raw=true)  |
 
-## Test
+**- todo 업데이트 예정**
+- (ours Model)PESQ: ???
 
-LAS model 기반으로 Clovacall Dataset ASR
-
-**CER(Character Error Rate)**
-
-| Clean | Mixed | Denoising |
+| Mix | predict | GT |
 |---|---|---|
-|**21%**|**106%**|**39%**|
+| [mixture.wav]|  [predict.wav]|  [GT.wav] |
 
-- 106%: Predict Length가 Target Length보다 작을 경우(e.g Target: 안녕하세요 / Predict: 그래)
-- 약 **70%** 감소 시키는 효과를 보였음
