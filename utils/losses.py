@@ -40,3 +40,54 @@ def wSDR(args, n_fft, hop_length, mixed, y_pred, y_GT, eps=1e-8):
     return torch.mean(wsdr)
 
 
+############################################
+# SISNRLOSS
+############################################
+
+
+def l2_norm(s1, s2):
+    # norm = torch.sqrt(torch.sum(s1*s2, 1, keepdim=True))
+    # norm = torch.norm(s1*s2, 1, keepdim=True)
+
+    norm = torch.sum(s1 * s2, -1, keepdim=True)
+    return norm
+
+
+def si_snr(s1, s2, eps=1e-8):
+    # s1: estimated time domain waveform( mask 입혀진 waveform )
+    # s2: clean time domain waveform( Ground Truth 느낌 )
+    s1_s2_norm = l2_norm(s1, s2)
+    s2_s2_norm = l2_norm(s2, s2)
+    s_target = s1_s2_norm / (s2_s2_norm + eps) * s2
+    e_noise = s1 - s_target
+
+    target_norm = l2_norm(s_target, s_target)
+    noise_norm = l2_norm(e_noise, e_noise)
+
+    snr = 10 * torch.log10((target_norm) / (noise_norm + eps) + eps)
+    return torch.mean(snr)
+
+
+class SISNRLoss(nn.Module):
+
+    def __init__(self, args, n_fft, hop_length, eps=1e-8,):
+        super(SISNRLoss, self).__init__()
+        self.eps = eps
+        self.istft = ISTFT(n_fft=n_fft, hop_length=hop_length).cuda(args.gpu)
+
+    def forward(self, s1, s2):
+        # s1: estimated Time Waveform( mask 입혀진 waveform )
+        # s2: clean Sepctrogram( Ground Truth 느낌 )
+        s2 = self.istft(s2)
+        # print(s2.size())
+        s2 = torch.squeeze(s2, 1)
+        # print(s2.size())
+        # print("A",s1.size())
+        return -(si_snr(s1, s2, eps=self.eps))
+
+
+if __name__ == '__main__':
+    loss = SISNRLoss(n_fft=3076, hop_length=772, args='gg').cuda()
+    s2 = torch.randn(2, 1, 1539, 214, 2).cuda()
+    s1 = torch.randn(2, 165974).cuda()
+    print(loss(s1, s2))

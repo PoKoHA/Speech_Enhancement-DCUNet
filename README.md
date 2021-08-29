@@ -1,9 +1,11 @@
-**TEST_02 Branch: Mask나 mixed Input의 Spectrogram shape는 [batch, channel=1, freq, time, 실수 허수],
-여기서 Time을 Length로 두고 freq을 Dim로 두어 Real과 Imag끼리 MultiHeadAttention 수행**
->>결과:pesq=3.0115 GPU Memory는 더 잡아먹는데(batch 16) 결과는 더 안좋아졌음
+**Final Branch**
 
-> 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여
-> 좋은 결과를 만들어냄
+- Encoder와 Decoder Skip Connection에 **CBAM**을 적용
+- **ASR Transformer**에 사용하였던 ScheduleAdam을 사용
+- Self Attention 적용한 **Discriminator** 적용
+- Loss를 wSDR이 아닌 **SI-SNR**로 바꿈(DCCRN꺼 그대로)
+> `python main.py --gpu(or MultiGPU) --batch-size ** --warm-steps (batch에 따라 유연성있게) --epochs 40
+> --decay_epoch 20`
 
 ## DCUnet
 

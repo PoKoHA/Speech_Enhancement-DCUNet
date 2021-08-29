@@ -146,9 +146,11 @@ class ChannelGate(nn.Module):
             if pool_type=='avg':
                 avg_pool = F.avg_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
                 channel_att_raw = self.mlp( avg_pool )
+                # print(channel_att_raw.size())
             elif pool_type=='max':
                 max_pool = F.max_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
                 channel_att_raw = self.mlp( max_pool )
+                # print(channel_att_raw.size())
             elif pool_type=='lp':
                 lp_pool = F.lp_pool2d( x, 2, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
                 channel_att_raw = self.mlp( lp_pool )
@@ -171,6 +173,75 @@ def logsumexp_2d(tensor):
     outputs = s + (tensor_flatten - s).exp().sum(dim=2, keepdim=True).log()
     return outputs
 
+
+class CCBAM(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
+        super(CCBAM, self).__init__()
+        self.ChannelGate_real = ChannelGate(gate_channels, reduction_ratio, pool_types)
+        self.ChannelGate_imag = ChannelGate(gate_channels, reduction_ratio, pool_types)
+
+        self.no_spatial=no_spatial
+        if not no_spatial:
+            self.SpatialGate_real = SpatialGate()
+            self.SpatialGate_imag = SpatialGate()
+    def forward(self, x):
+        real = x[..., 0]
+        imag = x[..., 1]
+
+        real_out = self.ChannelGate_real(real)
+        if not self.no_spatial:
+            real_out = self.SpatialGate_real(real_out)
+
+        imag_out = self.ChannelGate_imag(imag)
+        if not self.no_spatial:
+            imag_out = self.SpatialGate_imag(imag_out)
+
+        x_out = torch.stack([real_out, imag_out], dim=-1)
+
+        return x_out
+
+
+#################################
+# Self-Attn(SAGAN)
+#################################
+class Self_Attn(nn.Module):
+
+    def __init__(self, in_channels=1):
+        super(Self_Attn, self).__init__()
+
+        self.in_channels = in_channels
+
+        self.conv_q = nn.Conv2d(in_channels=in_channels, out_channels=in_channels // 8, kernel_size=1)
+        self.conv_k = nn.Conv2d(in_channels=in_channels, out_channels=in_channels // 8, kernel_size=1)
+        self.conv_v = nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=1)
+        self.gamma = nn.Parameter(torch.zeros(1))
+
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        """
+        input: Spectrogram[batch, Channel=1, 1539, 214]
+        output: self Attn Value + input
+        attn = B X N X N (N: width * height)
+        """
+        # print("x", x.size())
+        batch, channel, freq, time = x.size()
+        Q = self.conv_q(x).view(batch, -1, freq*time).permute(0, 2, 1) # [batch, freq*time, channel]
+        K = self.conv_k(x).view(batch, -1, freq*time)
+        V = self.conv_v(x).view(batch, -1, freq*time)
+
+        energy = torch.bmm(Q, K) # [B, freq*time, freq*time]
+        attn = self.softmax(energy)
+
+        out = torch.bmm(V, attn.permute(0, 2, 1))
+        # print("V*attm: ", out.size())
+        out = out.view(batch, channel, freq, time)
+
+        out = self.gamma * out + x
+
+        return out, attn
+
+
 if __name__ == "__main__":
     test = torch.randn(1, 1, 1536, 256)
     C = SpatialGate()
@@ -179,4 +250,4 @@ if __name__ == "__main__":
 
     test_1 = torch.randn(1,3, 22, 22)
     # S = ChannelGate(gate_channels=)
-    print(S(test).size())
+    # print(S(test).size())

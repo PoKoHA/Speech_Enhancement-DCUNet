@@ -158,6 +158,7 @@ class DCUNet10(nn.Module):
 
         return output
 
+
 class DCUNet16(nn.Module):
 
     def __init__(self, args, n_fft=64, hop_length=16):
@@ -169,29 +170,33 @@ class DCUNet16(nn.Module):
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
 
-        # self.real_attn = MultiHeadAttention(args=args)
-        #
-        # self.imag_attn = MultiHeadAttention(args=args)
-        #
-        # self.target_real_attn = MultiHeadAttention(args=args)
-        # self.target_imag_attn = MultiHeadAttention(args=args)
-        #
-        # self.real_cross_attn = MultiHeadAttention(args=args)
-        # self.target_cross_attn = MultiHeadAttention(args=args)
-        # self.real_attn = SpatialGate()
-        # self.imag_attn = SpatialGate()
-
         self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
         self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
+
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
+        self.ccbam_0 = CCBAM(gate_channels=32, no_spatial=True)
+
         self.downsample1 = EncoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=32, out_channels=32)
+        self.ccbam_1 = CCBAM(gate_channels=32, no_spatial=True)
+
         self.downsample2 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=32, out_channels=64)
+        self.ccbam_2 = CCBAM(gate_channels=64, no_spatial=True)
+
         self.downsample3 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_3 = CCBAM(gate_channels=64, no_spatial=True)
+
         self.downsample4 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_4 = CCBAM(gate_channels=64, no_spatial=True)
+
         self.downsample5 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_5 = CCBAM(gate_channels=64, no_spatial=True)
+
         self.downsample6 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_6 = CCBAM(gate_channels=64, no_spatial=True)
+
         self.downsample7 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
+        self.ccbam_7 = CCBAM(gate_channels=64, no_spatial=True)
 
         # Decoder(Upsampling)
         self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
@@ -204,132 +209,138 @@ class DCUNet16(nn.Module):
         self.upsample7 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=64, out_channels=1,
                                       output_padding=(0, 1), bias=True, last=True)
 
-
-    def forward(self, x, target,is_istft=True):
+    # def forward(self, x, target,is_istft=True):
+    def forward(self, x, target, is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
         d0 = self.downsample0(x)
+        d0_attn = self.ccbam_0(d0)
         # display_feature(d0[..., 0], "Encoder_1_real")
         # display_feature(d0[..., 1], "Encoder_1_imag")
         # print("   d0: ", d0.size())
         d1 = self.downsample1(d0)
+        d1_attn = self.ccbam_1(d1)
         # display_feature(d1[..., 0], "Encoder_2_real")
         # display_feature(d1[..., 1], "Encoder_2_imag")
         # print("   d1: ", d1.size())
         d2 = self.downsample2(d1)
+        d2_attn = self.ccbam_2(d2)
         # display_feature(d2[..., 0], "Encoder_3_real")
         # display_feature(d2[..., 1], "Encoder_3_imag")
         # print("   d2: ", d2.size())
         d3 = self.downsample3(d2)
+        d3_attn = self.ccbam_3(d3)
         # display_feature(d3[..., 0], "Encoder_4_real")
         # display_feature(d3[..., 1], "Encoder_4_imag")
         # print("   d3: ", d3.size())
         d4 = self.downsample4(d3)
+        d4_attn = self.ccbam_4(d4)
         # display_feature(d4[..., 0], "Encoder_5_real")
         # display_feature(d4[..., 1], "Encoder_5_imag")
         # print("   d4: ", d4.size())
         d5 = self.downsample5(d4)
+        d5_attn = self.ccbam_5(d5)
         # display_feature(d5[..., 0], "Encoder_6_real")
         # display_feature(d5[..., 1], "Encoder_6_imag")
         # print("   d5: ", d5.size())
         d6 = self.downsample6(d5)
+        d6_attn = self.ccbam_6(d6)
         # display_feature(d6[..., 0], "Encoder_7_real")
         # display_feature(d6[..., 1], "Encoder_7_imag")
         # print("   d6: ", d6.size())
         d7 = self.downsample7(d6)
+        d7_attn = self.ccbam_7(d7)
         # display_feature(d7[..., 0], "Encoder_8_real")
         # display_feature(d7[..., 1], "Encoder_8_imag")
         # print("   d7: ", d7.size())
 
+        # d7_R_attn, R_map = self.attn_1(d7[..., 0])
+        # d7_I_attn, I_amp = self.attn_2(d7[..., 1])
+        # d7_attn = torch.stack([d7_R_attn, d7_I_attn], dim=-1)
         # print("   --[Decoder]-- ")
         # bridge 첫번째 Decoder에 skip connection X
-        u0 = self.upsample0(d7)
+        u0 = self.upsample0(d7_attn)
+
+        # u0 = torch.stack([u0_R_attn, u0_I_attn], dim=-1)
         # display_feature(u0[..., 0], "Decoder_1_real")
         # display_feature(u0[..., 1], "Decoder_1_imag")
 
         # skip-connection
-        c0 = torch.cat((u0, d6), dim=1)
+        c0 = torch.cat((u0, d6_attn), dim=1)
         # print("   u0: ", u0.size())
         # print("   concat(u0,d6): ", c0.size())
 
         u1 = self.upsample1(c0)
         # display_feature(u1[..., 0], "Decoder_2_real")
         # display_feature(u1[..., 1], "Decoder_2_imag")
-        c1 = torch.cat((u1, d5), dim=1)
+        c1 = torch.cat((u1, d5_attn), dim=1)
         # print("   u1: ", u1.size())
         # print("   concat(u1,d5): ", c1.size())
 
         u2 = self.upsample2(c1)
         # display_feature(u2[..., 0], "Decoder_3_real")
         # display_feature(u2[..., 1], "Decoder_3_imag")
-        c2 = torch.cat((u2, d4), dim=1)
+        c2 = torch.cat((u2, d4_attn), dim=1)
         # print("   u2: ", u2.size())
         # print("   concat(u2,d4): ", c2.size())
 
         u3 = self.upsample3(c2)
         # display_feature(u3[..., 0], "Decoder_4_real")
         # display_feature(u3[..., 1], "Decoder_4_imag")
-        c3 = torch.cat((u3, d3), dim=1)
+        c3 = torch.cat((u3, d3_attn), dim=1)
         # print("   u3: ", u3.size())
         # print("   concat(u3,d3): ", c3.size())
 
         u4 = self.upsample4(c3)
         # display_feature(u4[..., 0], "Decoder_5_real")
         # display_feature(u4[..., 1], "Decoder_5_imag")
-        c4 = torch.cat((u4, d2), dim=1)
+        c4 = torch.cat((u4, d2_attn), dim=1)
         # print("   u4: ", u4.size())
         # print("   concat(u4,d2): ", c4.size())
 
         u5 = self.upsample5(c4)
         # display_feature(u5[..., 0], "Decoder_6_real")
         # display_feature(u5[..., 1], "Decoder_6_imag")
-        c5 = torch.cat((u5, d1), dim=1)
+        c5 = torch.cat((u5, d1_attn), dim=1)
         # print("   u5: ", u5.size())
         # print("   concat(u5,d1): ", c5.size())
 
         u6 = self.upsample6(c5)
         # display_feature(u6[..., 0], "Decoder_7_real")
         # display_feature(u6[..., 1], "Decoder_7_imag")
-        c6 = torch.cat((u6, d0), dim=1)
+        c6 = torch.cat((u6, d0_attn), dim=1)
         # print("   u6: ", u6.size())
         # print("   concat(u6,d0): ", c6.size())
 
         u7 = self.upsample7(c6)
-        # print("   u7: ", u7.size()) # [1, 1, 1539, 214, 2]
 
-        """
-        mask selfattn
-        """
-        real = u7[..., 0] # [batch, channel=1, freq=1539, time=214]
+        # Transformer
+        real = u7[..., 0]  # [batch, channel=1, freq=1539, time=214]
         imag = u7[..., 1]
-        real = real.squeeze(1).permute(0, 2, 1) # [batch, time, freq]
-        imag = imag.squeeze(1).permute(0, 2, 1)
 
-        """
-        target selfattn
-        """
         target_real = target[..., 0]
         target_imag = target[..., 1]
-        target_real = target_real.squeeze(1).permute(0, 2, 1)
-        target_imag = target_imag.squeeze(1).permute(0, 2, 1)
 
+        # print("input", real.size())
         real_attn = self.real_transformer(real, target_real)
         imag_attn = self.imag_transformer(imag, target_imag)
 
-        real_attn = real_attn.permute(0, 2, 1)
-        imag_attn = imag_attn.permute(0, 2, 1)
-
-        real_attn = real_attn.unsqueeze(1)
-        imag_attn = imag_attn.unsqueeze(1)
-
+        # print("real", real_attn.size())
         mask = torch.stack([real_attn, imag_attn], dim=-1)
+        mask = torch.unsqueeze(mask, dim=1)
         # print(mask.size())
+        # print("mask", mask.size())
 
-        mask = mask * u7
-        output = x * mask
+        # m_db = librosa.amplitude_to_db(u7[..., 0].cpu().detach().numpy())
+        # display_spectrogram(m_db, "u7")
+        # m2_db = librosa.amplitude_to_db(mask[..., 0].cpu().detach().numpy())
+        # display_spectrogram(m2_db, "mask")
+
+        attn_mask = mask * u7
+        output_spec = x * attn_mask
         # print("pass", output.size())
 
         # print("x", x)
@@ -347,14 +358,14 @@ class DCUNet16(nn.Module):
 
         # display_spectrogram(real_db, "denoising_real")
         # display_spectrogram(real_mean_db, "denoising_real_mean")
-        #display_spectrogram(imag_db, "denoising_Imag")
-        #display_spectrogram(mag_db, "denoising_mag")
-        #display_spectrogram(phase_db, "denoising_phase")
+        # display_spectrogram(imag_db, "denoising_Imag")
+        # display_spectrogram(mag_db, "denoising_mag")
+        # display_spectrogram(phase_db, "denoising_phase")
         # print("\n", "  Apply Mask(input * u7): ", output.size())
         if is_istft:
             # output = torch.squeeze(output, 1)
             # output = torch.istft(output, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
-            output = self.istft(output)
+            output = self.istft(output_spec)
             # print("   istft: ", output.size())
             output = torch.squeeze(output, 1)
             # print("   reshape: ", output.size())
@@ -363,8 +374,7 @@ class DCUNet16(nn.Module):
             # plt.title("denoising")
             # plt.show()
 
-        return output
-
+        return output, output_spec
 
 def display_spectrogram(x, title):
     plt.figure(figsize=(15, 10))

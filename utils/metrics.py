@@ -2,25 +2,53 @@ from tqdm import tqdm
 import numpy as np
 
 import torch
+from torch.autograd import Variable
 import torchaudio
+
 from pypesq import pesq
 from model.ISTFT import ISTFT
 
-def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
+Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
+
+
+def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
+               D_real, D_imag, criterion_D):
+
     model.eval()
+    D_real.eval()
+    D_imag.eval()
+
     test_pesq = 0.
     total_loss = 0
     istft = ISTFT(hop_length=HOP_LENGTH, n_fft=N_FFT).cuda(args.gpu)
+
     with torch.no_grad():
         total_nan = 0
         for i, (mixed, target) in tqdm(enumerate(dataloader)):
             mixed = mixed.cuda(args.gpu)
             target = target.cuda(args.gpu)
 
+            valid = Variable(Tensor(np.ones((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
+            fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
+
             # test loss 구하기WW
-            pred_x = model(mixed, target=target) # time domain
-            loss = criterion(args, N_FFT, HOP_LENGTH, mixed, pred_x, target)
+            est_wav, est_spec = model(mixed, target=target) # time domain
+            si_snr_loss = criterion(est_wav, target)
+
+            # Real Discriminator
+            dis_fake_loss = criterion_D(D_real(est_spec[..., 0].detach()), fake)
+            dis_real_loss = criterion_D(D_real(target[..., 0]), valid)
+
+            loss_D_R = (dis_real_loss + dis_fake_loss) / 2
+
+            # Imag Discriminator
+            dis_fake_loss = criterion_D(D_imag(est_spec[..., 1].detach()), fake)
+            dis_real_loss = criterion_D(D_imag(target[..., 1]), valid)
+
+            loss_D_I = (dis_real_loss + dis_fake_loss) / 2
+
             # print(pred_x)
+            loss = si_snr_loss + loss_D_R + loss_D_I
             total_loss += loss.item()
 
             # PESQ score 구하기
