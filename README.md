@@ -5,8 +5,7 @@
 - Self Attention 적용한 **Discriminator** 적용
 - Loss를 wSDR이 아닌 **SI-SNR**로 바꿈(DCCRN꺼 그대로)
 
-- 수정: Inference할 때는 DCUnet(Upsampling7)을 걸치고 나온 Mask에 Input을 곱해준 Denoising Output(즉, attention을
-적용 하지 않은 Output)을 Decoder Input으로 할 예정
+- 수정: Final하고 다르게 Encoder selfAttn만 Mask에 해주었음
 
 ## Architecture
 

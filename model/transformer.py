@@ -149,23 +149,25 @@ class SpeechTransformer(nn.Module):
             dropout_p=dropout_p,
         )
 
-        self.decoder = Decoder(
-            args=args,
-            input_dim=input_dim,
-            d_model=d_model,
-            d_ff=d_ff,
-            n_layers=n_decoder_layers,
-            n_heads=n_heads,
-            dropout_p=dropout_p,
-        )
+        self.fc = nn.Linear(d_model, input_dim)
+        # self.decoder = Decoder(
+        #     args=args,
+        #     input_dim=input_dim,
+        #     d_model=d_model,
+        #     d_ff=d_ff,
+        #     n_layers=n_decoder_layers,
+        #     n_heads=n_heads,
+        #     dropout_p=dropout_p,
+        # )
 
     def forward(self, mask, target):
-
+        # print("mask", mask.size())
         encoder_outputs, encoder_attn = self.encoder(mask)
-        # print("pass")
-        decoder_outputs, target_self_attn, cross_attn = self.decoder(target, encoder_outputs)
+        encoder_outputs = self.fc(encoder_outputs)
+        # print("encoder", encoder_outputs.size())
+        # decoder_outputs, target_self_attn, cross_attn = self.decoder(target, encoder_outputs)
 
-        return decoder_outputs
+        return encoder_outputs
 
 
 if __name__ == "__main__":

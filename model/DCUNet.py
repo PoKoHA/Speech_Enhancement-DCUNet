@@ -338,8 +338,11 @@ class DCUNet16(nn.Module):
         # display_spectrogram(m_db, "u7")
         # m2_db = librosa.amplitude_to_db(mask[..., 0].cpu().detach().numpy())
         # display_spectrogram(m2_db, "mask")
-
+        # print("mask", mask.size())
+        # print("u7", u7.size())
         attn_mask = mask * u7
+        # print(x.size())
+        # print(attn_mask.size())
         output_spec = x * attn_mask
         # print("pass", output.size())
 
