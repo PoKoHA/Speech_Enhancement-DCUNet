@@ -60,7 +60,7 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
 
             for idx in range(len(target)):
                 clean_x_16 = torchaudio.transforms.Resample(48000, 16000).cuda(args.gpu)(target[idx, :].view(1, -1))
-                pred_x_16 = torchaudio.transforms.Resample(48000, 16000).cuda(args.gpu)(pred_x[idx, :].view(1, -1))
+                pred_x_16 = torchaudio.transforms.Resample(48000, 16000).cuda(args.gpu)(est_wav[idx, :].view(1, -1))
 
                 clean_x_16 = clean_x_16.cpu().numpy()
                 pred_x_16 = pred_x_16.detach().cpu().numpy()

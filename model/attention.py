@@ -105,6 +105,7 @@ class BasicConv(nn.Module):
 # Spatial Attention
 class ChannelPool(nn.Module):
     def forward(self, x):
+        # x [batch, chaanel, freq, time]
         return torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
 
 
@@ -116,16 +117,18 @@ class SpatialGate(nn.Module):
         self.spatial = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size-1) // 2, relu=False)
 
     def forward(self, x):
-        x_compress = self.compress(x)
-        x_out = self.spatial(x_compress)
-        scale = F.sigmoid(x_out) # broadcasting
+        # x [batch, chaanel, freq, time]
+        x_compress = self.compress(x) # [batch, max+mean=2, freq, time]
+        x_out = self.spatial(x_compress) # [batch, 1, freq, time]]
+        scale = F.sigmoid(x_out) # [batch, 1, freq, time]
         return x * scale
 
 
 # Channel Attention
 class Flatten(nn.Module):
     def forward(self, x):
-        return x.view(x.size(0), -1)
+        # x [batch, channel, 1, 1]
+        return x.view(x.size(0), -1) # [batch, channel]
 
 
 class ChannelGate(nn.Module):
@@ -141,20 +144,25 @@ class ChannelGate(nn.Module):
         self.pool_types = pool_types
 
     def forward(self, x):
+        # x [batch, channel, freq, time]
         channel_att_sum = None
         for pool_type in self.pool_types:
-            if pool_type=='avg':
+            if pool_type =='avg':
                 avg_pool = F.avg_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                # [batch, channel, 1, 1]
                 channel_att_raw = self.mlp( avg_pool )
+                # [batch, channel]
                 # print(channel_att_raw.size())
-            elif pool_type=='max':
+            elif pool_type =='max':
                 max_pool = F.max_pool2d( x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                # [batch, channel, 1, 1]
                 channel_att_raw = self.mlp( max_pool )
+                # [batch, channel]
                 # print(channel_att_raw.size())
-            elif pool_type=='lp':
+            elif pool_type =='lp':
                 lp_pool = F.lp_pool2d( x, 2, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
                 channel_att_raw = self.mlp( lp_pool )
-            elif pool_type=='lse':
+            elif pool_type =='lse':
                 # LSE pool only
                 lse_pool = logsumexp_2d(x)
                 channel_att_raw = self.mlp( lse_pool )
@@ -164,8 +172,11 @@ class ChannelGate(nn.Module):
             else:
                 channel_att_sum = channel_att_sum + channel_att_raw
 
-        scale = F.sigmoid( channel_att_sum ).unsqueeze(2).unsqueeze(3).expand_as(x)
+        scale = F.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
+        # [batch, channel, freq, time]
+
         return x * scale
+
 
 def logsumexp_2d(tensor):
     tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
@@ -180,10 +191,11 @@ class CCBAM(nn.Module):
         self.ChannelGate_real = ChannelGate(gate_channels, reduction_ratio, pool_types)
         self.ChannelGate_imag = ChannelGate(gate_channels, reduction_ratio, pool_types)
 
-        self.no_spatial=no_spatial
+        self.no_spatial = no_spatial
         if not no_spatial:
             self.SpatialGate_real = SpatialGate()
             self.SpatialGate_imag = SpatialGate()
+
     def forward(self, x):
         real = x[..., 0]
         imag = x[..., 1]
@@ -243,8 +255,8 @@ class Self_Attn(nn.Module):
 
 
 if __name__ == "__main__":
-    test = torch.randn(1, 1, 1536, 256)
-    C = SpatialGate()
+    test = torch.randn(2, 32, 259, 120, 2)
+    C = CCBAM(32)
     print(test.size())
     print(C(test).size())
 
