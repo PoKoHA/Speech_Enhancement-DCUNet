@@ -137,7 +137,7 @@ class SpeechTransformer(nn.Module):
     def __init__(self, args, input_dim=214, d_model=512, d_ff=2048, n_heads=8, n_encoder_layers=3,
                  n_decoder_layers=3, dropout_p=0.3, max_length=7000):
         super(SpeechTransformer, self).__init__()
-        assert d_model % n_heads ==0
+        assert d_model % n_heads == 0
 
         self.encoder = Encoder(
             args=args,
@@ -166,6 +166,7 @@ class SpeechTransformer(nn.Module):
         decoder_outputs, target_self_attn, cross_attn = self.decoder(target, encoder_outputs)
 
         return decoder_outputs
+
 
 if __name__ == "__main__":
     a = torch.randn(1, 1, 1539, 214).cuda()

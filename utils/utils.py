@@ -23,7 +23,7 @@ def generate_wav(model, mixed, max_len, n_fft, hop_length, args):
         # plt.plot(waveform.squeeze(0).cpu().numpy())
         # plt.title("Origin")
         # plt.show()
-        # print(waveform.size())
+
         waveform = waveform.numpy()
 
         current_len = waveform.shape[1]
@@ -31,21 +31,66 @@ def generate_wav(model, mixed, max_len, n_fft, hop_length, args):
         pad[0, -current_len:] = waveform[0, :max_len]
 
         input = torch.from_numpy(pad).cuda(args.gpu)
-        # print(input.size())
+
         # plt.figure(figsize=(15, 5))
         # plt.plot(input.squeeze(0).cpu().numpy())
         # plt.show()
         input_stft = stft(input)
-        # print(input_stft.size())
+
         input_stft = input_stft.unsqueeze(0) # batch
         with torch.no_grad():
-            pred = model(input_stft)
+            d0 = model.downsample0(input_stft)
+            d0_attn = model.ccbam_0(d0)
 
-        # plt.figure(figsize=(15,5))
-        # plt.plot(pred.squeeze(0)[-current_len:].cpu().numpy())
-        # plt.title("Denoising")
-        # plt.show()
-        # print("A", pred.size())
+            d1 = model.downsample1(d0)
+            d1_attn = model.ccbam_1(d1)
+
+            d2 = model.downsample2(d1)
+            d2_attn = model.ccbam_2(d2)
+
+            d3 = model.downsample3(d2)
+            d3_attn = model.ccbam_3(d3)
+
+            d4 = model.downsample4(d3)
+            d4_attn = model.ccbam_4(d4)
+
+            d5 = model.downsample5(d4)
+            d5_attn = model.ccbam_5(d5)
+
+            d6 = model.downsample6(d5)
+            d6_attn = model.ccbam_6(d6)
+
+            d7 = model.downsample7(d6)
+            d7_attn = model.ccbam_7(d7)
+            # bridge 첫번째 Decoder에 skip connection X
+            # skip-connection
+            u0 = model.upsample0(d7_attn)
+            c0 = torch.cat((u0, d6_attn), dim=1)
+
+            u1 = model.upsample1(c0)
+            c1 = torch.cat((u1, d5_attn), dim=1)
+
+            u2 = model.upsample2(c1)
+            c2 = torch.cat((u2, d4_attn), dim=1)
+
+            u3 = model.upsample3(c2)
+            c3 = torch.cat((u3, d3_attn), dim=1)
+
+            u4 = model.upsample4(c3)
+            c4 = torch.cat((u4, d2_attn), dim=1)
+
+            u5 = model.upsample5(c4)
+            c5 = torch.cat((u5, d1_attn), dim=1)
+
+            u6 = model.upsample6(c5)
+            c6 = torch.cat((u6, d0_attn), dim=1)
+
+            u7 = model.upsample7(c6)
+
+            decoder_input = u7 * input_stft
+
+            pred, _ = model(input_stft, decoder_input)
+
         name = "predict_" + name
         output = os.path.join("output", name)
         sf.write(output, pred.squeeze(0)[-current_len:].cpu().numpy(), samplerate=48000, format='WAV', subtype='PCM_16')
