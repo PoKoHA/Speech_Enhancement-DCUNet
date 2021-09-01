@@ -15,19 +15,39 @@ def init_weight(m):
     if m.bias is not None:
         nn.init.constant_(m.bias, 0)
 
-class ScaledDotProductAttention(nn.Module):
+class SelfAttention(nn.Module):
 
-    def __init__(self, dim, dropout_p=0.1):
-        super(ScaledDotProductAttention, self).__init__()
+    def __init__(self, dim, n_heads, dropout_p=0.1):
+        super(SelfAttention, self).__init__()
+        self.d_model = dim
+        self.n_heads = n_heads
+
         self.sqrt_dim = np.sqrt(dim)
+        self.attn_dim = dim // n_heads # 512 // 8 = 64
         self.dropout = nn.Dropout(dropout_p)
 
+        self.Linear_Q = nn.Linear(dim, self.attn_dim, bias=True)
+        self.Linear_K = nn.Linear(dim, self.attn_dim, bias=True)
+        self.Linear_V = nn.Linear(dim, self.attn_dim, bias=True)
+        init_weight(self.Linear_Q)
+        init_weight(self.Linear_K)
+        init_weight(self.Linear_V)
+
     def forward(self, query, key, value, mask=None):
+        # print("B")
+        query = self.Linear_Q(query)
+        key = self.Linear_K(key)
+        value = self.Linear_V(value)
+
+        # mask
+        if mask is not None:
+            mask = mask.repeat(self.n_heads, 1, 1)
+
         score = torch.bmm(query, key.transpose(1, 2)) / self.sqrt_dim
 
         if mask is not None:
-            # print("score: ", score.size())
-            # print("mask: ", mask.size())
+            # # print("score: ", score.size())
+            # # print("mask: ", mask.size())
             score.masked_fill_(mask, -np.inf)
 
         attn = F.softmax(score, -1)
@@ -42,45 +62,32 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, d_model=512, n_heads=8):
         super(MultiHeadAttention, self).__init__()
         assert d_model % n_heads == 0, "attention dim = d_model / heads 해야 하기 때문에"
-
         self.attn_dim = int(d_model / n_heads) # default:64
         self.n_heads = n_heads
+        self.attentions = nn.ModuleList([SelfAttention(d_model, n_heads)
+                                         for _ in range(n_heads)]) # sqrt(d_k)
 
-        # todo 뒤 사이즈가 조금 다름 원래 attn_dim만 들어갔는데
-        # Projection
-        self.Linear_Q = nn.Linear(d_model, self.attn_dim * n_heads, bias=True)
-        self.Linear_K = nn.Linear(d_model, self.attn_dim * n_heads, bias=True)
-        self.Linear_V = nn.Linear(d_model, self.attn_dim * n_heads, bias=True)
-        init_weight(self.Linear_Q)
-        init_weight(self.Linear_K)
-        init_weight(self.Linear_V)
-
-        self.scaled_dot_attn = ScaledDotProductAttention(self.attn_dim) # sqrt(d_k)
+        self.fc = nn.Linear(d_model, d_model, bias=False)
+        init_weight(self.fc)
 
     def forward(self, q, k, v, mask=None):
-        batch_size = v.size(0)
-        # print("q", q.size())
-        # print("k", k.size())
+        # print("  [Attention]  ")
+        # print("   q", q.size())
+        # print("   k", k.size())
+        # print("   v", v.size())
 
-        # [Batch, Length, N, D] = [Batch, Length, 8, 64]
-        query = self.Linear_Q(q).view(batch_size, -1, self.n_heads, self.attn_dim)
-        key = self.Linear_K(k).view(batch_size, -1, self.n_heads, self.attn_dim)
-        value = self.Linear_V(v).view(batch_size, -1, self.n_heads, self.attn_dim)
+        # context, attn = self.attentions(q, k, v, mask) # [1, 1539, 64]
+        self_attentions = [attention(q, k, v, mask) for attention in self.attentions]
 
-        # [Batch * N, Length, Dim]
-        query = query.permute(2, 0, 1, 3).contiguous().view(batch_size * self.n_heads, -1, self.attn_dim)
-        key = key.permute(2, 0, 1, 3).contiguous().view(batch_size * self.n_heads, -1, self.attn_dim)
-        value = value.permute(2, 0, 1, 3).contiguous().view(batch_size * self.n_heads, -1, self.attn_dim)
+        weight_vs = [weighted_v[0] for weighted_v in self_attentions]
+        attentions = [weighted_v[1] for weighted_v in self_attentions]
+        weighted_v = torch.cat(weight_vs, dim=-1)
+        # print("  torch.cat", weighted_v.size())
+        # context = weighted_v.permute(1, 2, 0, 3).contiguous().view(batch_size, -1, self.n_heads * self.attn_dim)
+        context = self.fc(weighted_v)
+        # print("  Linear: ", context.size())
 
-        # mask
-        if mask is not None:
-            mask = mask.repeat(self.n_heads, 1, 1)
-
-        context, attn = self.scaled_dot_attn(query, key, value, mask)
-        context = context.view(self.n_heads, batch_size, -1, self.attn_dim)
-        context = context.permute(1, 2, 0, 3).contiguous().view(batch_size, -1, self.n_heads * self.attn_dim)
-
-        return context, attn
+        return context, attentions
 
 
 #####################

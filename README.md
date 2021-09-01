@@ -1,3 +1,5 @@
+(2021-09-01) ~~ASR Transformer  오류 수정~~
+
 **Final Branch**
 
 - Encoder와 Decoder Skip Connection에 **CBAM**을 적용
@@ -7,6 +9,8 @@
 
 - 수정: Inference할 때는 DCUnet(Upsampling7)을 걸치고 나온 Mask에 Input을 곱해준 Denoising Output(즉, attention을
 적용 하지 않은 Output)을 Decoder Input으로 할 예정
+
+
 
 ## Architecture
 
