@@ -210,7 +210,7 @@ class DCUNet16(nn.Module):
                                       output_padding=(0, 1), bias=True, last=True)
 
     # def forward(self, x, target,is_istft=True):
-    def forward(self, x, target, is_istft=True):
+    def forward(self, x, is_istft=True):
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
@@ -321,12 +321,10 @@ class DCUNet16(nn.Module):
         real = u7[..., 0]  # [batch, channel=1, freq=1539, time=214]
         imag = u7[..., 1]
 
-        target_real = target[..., 0]
-        target_imag = target[..., 1]
 
         # print("input", real.size())
-        real_attn = self.real_transformer(real, target_real)
-        imag_attn = self.imag_transformer(imag, target_imag)
+        real_attn = self.real_transformer(real)
+        imag_attn = self.imag_transformer(imag)
 
         # print("real", real_attn.size())
         mask = torch.stack([real_attn, imag_attn], dim=-1)

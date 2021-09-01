@@ -76,13 +76,18 @@ class VGGExtractor(nn.Module):
         return (self.input_dim - 1) << 5 if self.input_dim % 2 else self.input_dim << 5
 
     def forward(self, inputs):
+        print("  [VGGExtractor]  ")
         # [batch, channel=1, freq=1539, time=214]
         # print(inputs)
         # print("C", inputs.transpose(2,3).size())
         outputs = self.conv(inputs.transpose(2, 3)) # [batch, cnannel, 214t, 1539freq]
+        print("    Mask.Transpose(2,3): ", inputs.transpose(2,3).size())
+        print("    VGG: ", outputs.size())
         # print("g", outputs.size())
         batch_size, channels, dimension, seq_lengths = outputs.size()
         outputs = outputs.permute(0, 3, 1, 2) # [batch, freq, channel,time]
+        print("    Permute[batch, freq, channel, time]: ", outputs.size())
         outputs = outputs.view(batch_size, seq_lengths, channels * dimension)
+        print("    reshape[batch, freq, channel * time]: ", outputs.size())
 
         return outputs

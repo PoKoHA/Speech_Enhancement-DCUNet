@@ -333,7 +333,7 @@ def train(train_loader, model, criterion, optimizer, epoch, n_fft, hop_length, a
         fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
 
         # DCUnet Loss
-        est_wav, est_spec = model(mixed, target=target) # DCUnet
+        est_wav, est_spec = model(mixed) # DCUnet
         si_snr_loss = criterion(est_wav, target)
 
 

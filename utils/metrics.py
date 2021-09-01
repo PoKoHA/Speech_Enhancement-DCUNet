@@ -32,7 +32,7 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
             fake = Variable(Tensor(np.zeros((mixed.size(0), *(1, 96, 13)))), requires_grad=False)
 
             # test loss 구하기WW
-            est_wav, est_spec = model(mixed, target=target) # time domain
+            est_wav, est_spec = model(mixed) # time domain
             si_snr_loss = criterion(est_wav, target)
 
             # Real Discriminator
@@ -71,6 +71,7 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
                 score = pesq(clean_x_16.flatten(), pred_x_16.flatten(), 16000)
 
                 if np.isnan(score):
+                    print('nan')
                     nan += 1
                     total_nan += 1
                 else:
@@ -78,8 +79,9 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH,
                 # print("A", psq)
 
             # print("B", len(target) - nan)
-            psq /= (len(target) - nan)
-            test_pesq += psq
+            if not len(target) - nan == 0:
+                psq /= (len(target) - nan)
+                test_pesq += psq
             # print(test_pesq)
 
         # print(total_nan)
