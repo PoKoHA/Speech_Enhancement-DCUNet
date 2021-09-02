@@ -34,10 +34,13 @@ class SelfAttention(nn.Module):
         init_weight(self.Linear_V)
 
     def forward(self, query, key, value, mask=None):
-        print("B")
+        # print("  [MultiHeadAttn]")
         query = self.Linear_Q(query)
         key = self.Linear_K(key)
         value = self.Linear_V(value)
+        # print("  Linear_Q", query.size())
+        # print("  Linear_k", key.size())
+        # print("  Linear_V", value.size())
 
         # mask
         if mask is not None:
@@ -71,11 +74,11 @@ class MultiHeadAttention(nn.Module):
         init_weight(self.fc)
 
     def forward(self, q, k, v, mask=None):
-        batch_size = v.size(0)
-        print("  [Attention]  ")
-        print("   q", q.size())
-        print("   k", k.size())
-        print("   v", v.size())
+        # batch_size = v.size(0)
+        # print("  [Attention]  ")
+        # print("   q", q.size())
+        # print("   k", k.size())
+        # print("   v", v.size())
 
         # context, attn = self.attentions(q, k, v, mask) # [1, 1539, 64]
         self_attentions = [attention(q, k, v, mask) for attention in self.attentions]
@@ -83,10 +86,10 @@ class MultiHeadAttention(nn.Module):
         weight_vs = [weighted_v[0] for weighted_v in self_attentions]
         attentions = [weighted_v[1] for weighted_v in self_attentions]
         weighted_v = torch.cat(weight_vs, dim=-1)
-        print("  torch.cat", weighted_v.size())
+        # print("  torch.cat", weighted_v.size())
         # context = weighted_v.permute(1, 2, 0, 3).contiguous().view(batch_size, -1, self.n_heads * self.attn_dim)
         context = self.fc(weighted_v)
-        print("  Linear: ", context.size())
+        # print("  Linear: ", context.size())
 
         return context, attentions
 
@@ -253,29 +256,40 @@ class Self_Attn(nn.Module):
         attn = B X N X N (N: width * height)
         """
         # # print("x", x.size())
+        # print("  Input: ", x.size())
         batch, channel, freq, time = x.size()
         Q = self.conv_q(x).view(batch, -1, freq*time).permute(0, 2, 1) # [batch, freq*time, channel]
+        # print("  conv_q", self.conv_q(x).size())
         K = self.conv_k(x).view(batch, -1, freq*time)
+        # print("  conv_k", self.conv_q(x).size())
         V = self.conv_v(x).view(batch, -1, freq*time)
+        # print("  conv_v", self.conv_q(x).size())
+        # print("  Q,K,V Reshaped: ", K.size())
 
         energy = torch.bmm(Q, K) # [B, freq*time, freq*time]
+        # print("  Softmax(Q.permute * k)", energy.size())
         attn = self.softmax(energy)
 
         out = torch.bmm(V, attn.permute(0, 2, 1))
+        # print("  Output * V", out.size())
         # # print("V*attm: ", out.size())
         out = out.view(batch, channel, freq, time)
+        # print("  reshaped: ", out.size())
 
         out = self.gamma * out + x
+        # print("  output*gamma + input: ", out.size())
 
         return out, attn
 
 
 if __name__ == "__main__":
-    test = torch.randn(2, 32, 770, 107)
+    test = torch.randn(1, 512, 96, 13)
     # C = SpatialGate()
-    C= SpatialGate()
-    print(" input: ", test.size())
-    print(C(test).size())
+    # C= SpatialGate()
+    # print(" input: ", test.size())
+    # print(C(test).size())
+    t = Self_Attn(512)
+    print(t(test)[0].size())
 
     # test_1 = torch.randn(1,3, 22, 22)
     # # S = ChannelGate(gate_channels=)

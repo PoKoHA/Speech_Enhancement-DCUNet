@@ -36,26 +36,30 @@ class Discriminator(nn.Module):
         self.attn2 = Self_Attn(512)
 
     def forward(self, input): # input[1, 1, 1539, 214]
-        # print("I:", input.size())
+        print("  Input:", input.size())
         convLayer_1 = self.convLayer_1(input) # [B, 64, 769, 107]
+        print("  conv1:", convLayer_1.size())
         convLayer_2 = self.convLayer_2(convLayer_1) # [2, 128, 384, 53]
+        print("  conv2:", convLayer_2.size())
         convLayer_3 = self.convLayer_3(convLayer_2) # [B, 256, 192, 26]
+        print("  conv3:", convLayer_3.size())
         # print("3:", convLayer_3.size())
         # print("PASS")
         attn_1, map_1 = self.attn1(convLayer_3)
-        # print(attn_1.size())
+        print("  Attn_1",attn_1.size())
         convLayer_4 = self.convLayer_4(attn_1) # [B, 512, 96, 13]
-        # print("4:", convLayer_4.size())
+        print("  conv4:", convLayer_4.size())
         # print("pass")
         attn_2, map_2 = self.attn2(convLayer_4)
+        print("  Attn_2:", attn_2.size())
         zeropad = self.zeropad(attn_2) # [B, 512, 97, 14]
-        # print("5:", zeropad.size())
+        print("  Padding:", zeropad.size())
         output = self.convLayer_5(zeropad) # [B, 512, 96, 13]
-        # print("output:", output.size())
+        print("  conv_5:", output.size())
 
         return output # [B, 1, 96, 13]
 
 if __name__ == '__main__':
-    test = torch.randn(2, 1, 1539, 214).cuda()
-    D = Discriminator(input_shape=(1, 1539, 214)).cuda()
+    test = torch.randn(2, 1, 1539, 214)
+    D = Discriminator(input_shape=(1, 1539, 214))
     print(D(test).size())

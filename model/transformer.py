@@ -44,16 +44,16 @@ class Encoder(nn.Module):
         self.layers = nn.ModuleList([EncoderLayer(d_model, n_heads, d_ff) for _ in range(n_layers)])
 
     def forward(self, inputs):
-        print('--[Encoder]--')
-        print("  Input(mask)", inputs.size())
+        # print('--[Encoder]--')
+        # print("  Input(mask)", inputs.size())
         conv_outputs = self.conv(inputs)
         # print("p", conv_outputs.size())
         # print(self.linear)
         outputs = self.linear(conv_outputs)
-        print("  Linear:", outputs.size())
+        # print("  Linear:", outputs.size())
         # print("pos", self.positional_encoding(outputs.size(1)).size())
         outputs += self.positional_encoding(outputs.size(1))
-        print("  output+Pos_Encoding:", outputs.size())
+        # print("  output+Pos_Encoding:", outputs.size())
         outputs = self.dropout(outputs)
 
         for layer in self.layers:
@@ -126,9 +126,10 @@ class Decoder(nn.Module):
                 outputs, encoder_outputs, decoder_mask, encoder_pad_mask
             )
 
-        # print("Decoder: ", outputs.size())
+        # print("  Multi-Head-Attn-Output: ", outputs.size())
         outputs = self.fc(outputs)
-        # print("De_out: ", outputs.size())
+        # print("  Linear: ", outputs.size())
+        # print("  Expand: ", outputs.unsqueeze(1).size())
 
         return outputs, self_attn, cross_attn
 
@@ -172,7 +173,7 @@ class SpeechTransformer(nn.Module):
 
 if __name__ == "__main__":
     a = torch.randn(2, 1, 1539, 214).cuda()
-    b = torch.randn(2, 1, 1539, 214).cuda()
+    b = torch.randn(2, 1539, 512).cuda()
     c = SpeechTransformer(args="GOOD").cuda()
-    print(c.encoder(a)[0].size())
+    print(c.decoder(a, b)[0].size())
 
