@@ -78,7 +78,7 @@ Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19f
 | [mixture.wav](./example/mixed.wav?raw=true) |  [predict.wav](./example/predict.wav?raw=true)  |  [GT.wav](./example/GT.wav?raw=true)  |
 
 **- todo 업데이트 예정**
-- (ours Model)PESQ: ???
+- **(ours Model)PESQ: 약 3.3**~~(GPU고장으로 학습 중단하고 뽑은 Score)~~
 
 | Mix | predict | GT |
 |---|---|---|
