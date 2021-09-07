@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 """
 Transformer에서 사용하는 MultiheadSelfAttention 적용
 """
@@ -94,6 +93,7 @@ class MultiHeadAttention(nn.Module):
 # CBAM
 #####################
 class BasicConv(nn.Module):
+
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=True, bias=False):
         super(BasicConv, self).__init__()
         self.out_channels = out_planes
@@ -260,13 +260,47 @@ class Self_Attn(nn.Module):
 
         return out, attn
 
+###############################
+# Freq, Temporal Attention
+###############################
+class FreqGate(nn.Module):
+
+    def __init__(self):
+        super(FreqGate, self).__init__()
+
+        self.conv = BasicConv(2, 1, kernel_size=(7, 1), stride=1, padding=(3, 0), relu=False)
+        self.compress = ChannelPool()
+
+    def forward(self, x):
+        # x [Batch, C, Freq, Time]
+        x_avg = F.avg_pool2d(x, (1, x.size(3)), stride=(1, x.size(3))) # [batch, C, Freq, 1]
+        compress = self.compress(x_avg) # [batch, 2, Freq, 1]
+        conv = self.conv(compress) # [batch, 1, Freq, 1]
+        scale = F.sigmoid(conv)
+
+        return x * scale
+
+
+class TemporalGate(nn.Module):
+
+    def __init__(self):
+        super(TemporalGate, self).__init__()
+
+        self.conv = BasicConv(2, 1, kernel_size=(1, 7), stride=1, padding=(0, 3), relu=False)
+        self.compress = ChannelPool()
+
+    def forward(self, x):
+        # x [Batch, C, Freq, Time]
+        x_avg = F.avg_pool2d(x, (x.size(2), 1), stride=(x.size(2), 1)) # [batch, C, 1, Time]
+        compress = self.compress(x_avg) # [batch, 2, 1, Time]
+        conv = self.conv(compress) # [batch, 1, 1, TIme]
+        scale = F.sigmoid(conv)
+
+        return x * scale
+
 
 if __name__ == "__main__":
-    test = torch.randn(2, 32, 259, 120, 2)
-    C = CCBAM(32)
-    print(test.size())
-    print(C(test).size())
+    test = torch.randn(2, 32, 259, 120)
+    c = FreqGate()
+    t = TemporalGate()
 
-    test_1 = torch.randn(1,3, 22, 22)
-    # S = ChannelGate(gate_channels=)
-    # print(S(test).size())
