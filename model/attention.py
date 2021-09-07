@@ -278,7 +278,7 @@ class FreqGate(nn.Module):
         conv = self.conv(compress) # [batch, 1, Freq, 1]
         scale = F.sigmoid(conv)
 
-        return x * scale
+        return scale
 
 
 class TemporalGate(nn.Module):
@@ -296,11 +296,52 @@ class TemporalGate(nn.Module):
         conv = self.conv(compress) # [batch, 1, 1, TIme]
         scale = F.sigmoid(conv)
 
-        return x * scale
+        return scale
+
+
+class CSpecCBAM(nn.Module):
+
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
+        super(CSpecCBAM, self).__init__()
+        self.ChannelGate_real = ChannelGate(gate_channels, reduction_ratio, pool_types)
+        self.ChannelGate_imag = ChannelGate(gate_channels, reduction_ratio, pool_types)
+
+        self.no_spatial = no_spatial
+
+        if not no_spatial:
+            self.FreqGate_real = FreqGate()
+            self.TemporalGate_real = TemporalGate()
+
+            self.FreqGate_imag = FreqGate()
+            self.TemporalGate_imag = TemporalGate()
+
+    def forward(self, x):
+        # [batch, channel, Freq, time, 2]
+        real = x[..., 0]
+        imag = x[..., 1]
+
+        real_ch = self.ChannelGate_real(real)
+        if not self.no_spatial:
+            real_freq = self.FreqGate_real(real_ch) # [batch, 1, freq, 1]
+            real_time = self.TemporalGate_real(real_ch) # [batch, 1, 1, time]
+            scale_real = (real_freq * real_time) # [batch, 1, freq, time]
+            real = real_ch * scale_real
+
+        imag_ch = self.ChannelGate_imag(imag)
+        if not self.no_spatial:
+            imag_freq = self.FreqGate_real(imag_ch)  # [batch, 1, freq, 1]
+            imag_time = self.TemporalGate_real(imag_ch)  # [batch, 1, 1, time]
+            scale_imag = (imag_freq * imag_time)  # [batch, 1, freq, time]
+            imag = real_ch * scale_imag
+
+        output = torch.stack([real, imag], dim=-1) # [batch, channel, Freq, Time, 2]
+
+        return output
 
 
 if __name__ == "__main__":
-    test = torch.randn(2, 32, 259, 120)
-    c = FreqGate()
-    t = TemporalGate()
+    test = torch.randn(2, 32, 259, 120, 2)
+    a = CSpecCBAM(32)
+
+    print(a(test).size())
 

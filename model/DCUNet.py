@@ -175,28 +175,28 @@ class DCUNet16(nn.Module):
 
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
-        self.ccbam_0 = CCBAM(gate_channels=32, no_spatial=True)
+        self.ccbam_0 = CCBAM(gate_channels=32)
 
         self.downsample1 = EncoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=32, out_channels=32)
-        self.ccbam_1 = CCBAM(gate_channels=32, no_spatial=True)
+        self.ccbam_1 = CCBAM(gate_channels=32)
 
         self.downsample2 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=32, out_channels=64)
-        self.ccbam_2 = CCBAM(gate_channels=64, no_spatial=True)
+        self.ccbam_2 = CCBAM(gate_channels=64)
 
         self.downsample3 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
-        self.ccbam_3 = CCBAM(gate_channels=64, no_spatial=True)
+        self.ccbam_3 = CCBAM(gate_channels=64)
 
         self.downsample4 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
-        self.ccbam_4 = CCBAM(gate_channels=64, no_spatial=True)
+        self.ccbam_4 = CCBAM(gate_channels=64)
 
         self.downsample5 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
-        self.ccbam_5 = CCBAM(gate_channels=64, no_spatial=True)
+        self.ccbam_5 = CCBAM(gate_channels=64)
 
         self.downsample6 = EncoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=64, out_channels=64)
-        self.ccbam_6 = CCBAM(gate_channels=64, no_spatial=True)
+        self.ccbam_6 = CCBAM(gate_channels=64)
 
         self.downsample7 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
-        self.ccbam_7 = CCBAM(gate_channels=64, no_spatial=True)
+        self.ccbam_7 = CCBAM(gate_channels=64)
 
         # Decoder(Upsampling)
         self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
