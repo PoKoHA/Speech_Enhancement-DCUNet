@@ -12,8 +12,10 @@ import torch.nn as nn
 
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
+from data.conv_stft import *
 
 from utils.utils import display_feature
+
 
 class EncoderBlock(nn.Module):
 
@@ -52,22 +54,34 @@ class DecoderBlock(nn.Module):
         Trans_cConv = self.Trans_cConv(x)
         # Paper) last_decoder_layer 에서는 BN과 Activation 을 사용하지 않음
         if self.last:
+            mask_real = Trans_cConv[..., 0]
+            mask_imag = Trans_cConv[..., 1]
+
+            mask_mag = (mask_real ** 2 + mask_imag ** 2)**0.5
+            real_phase = mask_real / (mask_mag + 1e-8)
+            imag_phase = mask_imag / (mask_mag + 1e-8)
+
+            mask_phase = torch.atan2(imag_phase, real_phase)
+            mask_mag = torch.tanh(mask_mag)
+
+            return mask_mag, mask_phase
+
             # display_feature(Trans_cConv[..., 0], "Decoder_8_real")
             # display_feature(Trans_cConv[..., 1], "Decoder_8_imag")
-            mask_phase = Trans_cConv / (torch.abs(Trans_cConv) + 1e-8)
+            # mask_phase = Trans_cConv / (torch.abs(Trans_cConv) + 1e-8)
             # print("mask_ph: ", mask_phase[0])
-            mask_mag = torch.tanh(torch.abs(Trans_cConv))
+            # mask_mag = torch.tanh(torch.abs(Trans_cConv))
             # print("mask_mag: ", mask_mag[0])
-            output = mask_phase * mask_mag # [batch, channel, 1539, 214, 2 ]
-            real = output[..., 0]
-            imag = output[..., 1]
-            mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
-            phase = torch.atan2(imag, real)
+            # output = mask_phase * mask_mag # [batch, channel, 1539, 214, 2 ]
+            # real = output[..., 0]
+            # imag = output[..., 1]
+            # mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
+            # phase = torch.atan2(imag, real)
 
-            real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
-            imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
-            phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
-            mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
+            # real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
+            # imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
+            # phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
+            # mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
 
             #display_spectrogram(real_db, "mask_Real")
             #display_spectrogram(imag_db, "mask_Imag")
@@ -78,7 +92,7 @@ class DecoderBlock(nn.Module):
             normed = self.cBN(Trans_cConv)
             output = self.leaky_relu(normed)
 
-        return output
+            return output
 
 
 class DCUNet10(nn.Module):
@@ -110,6 +124,7 @@ class DCUNet10(nn.Module):
     def forward(self, x, is_istft=True):
         # downsampling/encoding
         # # print("input: ", x.size())
+
         d0 = self.downsample0(x)
         d1 = self.downsample1(d0)
         d2 = self.downsample2(d1)
@@ -160,7 +175,9 @@ class DCUNet16(nn.Module):
         self.args = args
         self.n_fft = n_fft
         self.hop_length = hop_length
-        self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
+        # self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft)
+        self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
+        self.istft = ConviSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
 
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
@@ -179,18 +196,29 @@ class DCUNet16(nn.Module):
         self.upsample3 = DecoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=128, out_channels=64, output_padding=(0, 1))
         self.upsample4 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=128, out_channels=64)
         self.upsample5 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=128, out_channels=32)
-        self.upsample6 = DecoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=64, out_channels=32, output_padding=(1, 0))
+        self.upsample6 = DecoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=64, out_channels=32)
         self.upsample7 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=64, out_channels=1,
-                                      output_padding=(0, 1), bias=True, last=True)
+                                      bias=True, last=True)
 
 
     def forward(self, x, is_istft=True):
+        # print("input:", x.size())
+
+        x_noisy_stft = self.stft(x).unsqueeze(1)
+        # print("____", x_noisy_stft.size())
+        real, imag = torch.chunk(x_noisy_stft, 2, dim=2)
+        stft = torch.stack([real, imag], dim=-1)
+
+        real = stft[..., 0]
+        imag = stft[..., 1]
+        spec_mag = torch.sqrt(real ** 2 + imag ** 2 + 1e-8)
+        spec_phase = torch.atan2(imag, real)
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
-        d0 = self.downsample0(x)
+        d0 = self.downsample0(stft)
         # display_feature(d0[..., 0], "Encoder_1_real")
         # display_feature(d0[..., 1], "Encoder_1_imag")
         # print("   d0: ", d0.size())
@@ -232,7 +260,8 @@ class DCUNet16(nn.Module):
         # skip-connection
         c0 = torch.cat((u0, d6), dim=1)
         # print("   u0: ", u0.size())
-        # print("   concat(u0,d6): ", c0.size())
+        # print(d6.size())
+        # print("   concat(u0,d6): ", d6.size())
 
         u1 = self.upsample1(c0)
         # display_feature(u1[..., 0], "Decoder_2_real")
@@ -272,26 +301,39 @@ class DCUNet16(nn.Module):
         u6 = self.upsample6(c5)
         # display_feature(u6[..., 0], "Decoder_7_real")
         # display_feature(u6[..., 1], "Decoder_7_imag")
-        c6 = torch.cat((u6, d0), dim=1)
+        # print("   d0 ", d0.size())
         # print("   u6: ", u6.size())
+        c6 = torch.cat((u6, d0), dim=1)
+
         # print("   concat(u6,d0): ", c6.size())
 
-        u7 = self.upsample7(c6)
-        # print("   u7: ", u7.size())
+        # u7 = self.upsample7(c6)
 
-        output = x * u7
+        mask_mag, mask_phase = self.upsample7(c6)
+        # print("x", spec_mag)
+        # print("mask", mask_mag.size())
+        # print("mask", spec_mag.size())
+
+        est_mag = mask_mag * spec_mag
+        est_phase = spec_phase + mask_phase
+
+        est_real = est_mag * torch.cos(est_phase)
+        est_imag = est_mag * torch.sin(est_phase)
+        # [1, 512, 1653]
+        output = torch.cat([est_real, est_imag], dim=2).squeeze(1)
+        # output = x * u7
 
         # print("x", x)
-        real = output[..., 0]
-        imag = output[..., 1]
+        # real = output[..., 0]
+        # imag = output[..., 1]
         # print(real.size())
-        mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
-        phase = torch.atan2(imag, real)
+        # mag = torch.abs(torch.sqrt(real ** 2 + imag ** 2))
+        # phase = torch.atan2(imag, real)
 
-        real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
-        imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
-        phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
-        mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
+        # real_db = librosa.amplitude_to_db(real.cpu().detach().numpy())
+        # imag_db = librosa.amplitude_to_db(imag.cpu().detach().numpy())
+        # phase_db = librosa.amplitude_to_db(phase.cpu().detach().numpy())
+        # mag_db = librosa.amplitude_to_db(mag.cpu().detach().numpy())
 
         #display_spectrogram(real_db, "denoising_real")
         #display_spectrogram(imag_db, "denoising_Imag")
@@ -320,3 +362,7 @@ def display_spectrogram(x, title):
     plt.title(title)
     plt.show()
 
+if __name__ == "__main__":
+    a = torch.randn(2, 1, 1539, 214, 2)
+    b = DCUNet16(args="aa")
+    print(b(a))

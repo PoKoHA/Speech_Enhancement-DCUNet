@@ -34,12 +34,14 @@ parser.add_argument('--batch-size', type=int, default=32, help='Batch size in tr
 parser.add_argument('--lr', default=1e-4)
 parser.add_argument('--arch', type=str, default="DCUnet10")
 
-parser.add_argument('--clean-train-dir', type=str, default="dataset/56spk/clean_trainset_56spk_wav")
-parser.add_argument('--noisy-train-dir', type=str, default="dataset/56spk/noisy_trainset_56spk_wav")
-parser.add_argument('--clean-valid-dir', type=str, default="dataset/56spk/clean_validset_56spk_wav")
-parser.add_argument('--noisy-valid-dir', type=str, default="dataset/56spk/noisy_validset_56spk_wav")
-parser.add_argument('--clean-test-dir', type=str, default="dataset/clean_testset_wav")
-parser.add_argument('--noisy-test-dir', type=str, default="dataset/noisy_testset_wav")
+parser.add_argument('--clean-train-dir', type=str, default="dataset/train/clean_trainset_56spk_wav")
+parser.add_argument('--noisy-train-dir', type=str, default="dataset/train/noisy_trainset_56spk_wav")
+# parser.add_argument('--clean-train-dir', type=str, default="dataset/1/clean")
+# parser.add_argument('--noisy-train-dir', type=str, default="dataset/1/noisy")
+parser.add_argument('--clean-valid-dir', type=str, default="dataset/valid/clean_validset_56spk_wav")
+parser.add_argument('--noisy-valid-dir', type=str, default="dataset/valid/noisy_validset_56spk_wav")
+parser.add_argument('--clean-test-dir', type=str, default="dataset/test/clean_testset_wav")
+parser.add_argument('--noisy-test-dir', type=str, default="dataset/test/noisy_testset_wav")
 
 parser.add_argument('--sample-rate', type=int, default=48000, help="STFT hyperparam")
 parser.add_argument('--max-len', type=int, default=165000)
@@ -74,6 +76,7 @@ def main():
     ngpus_per_node = torch.cuda.device_count() # node: server(기계)라고 생각
 
     main_worker(args.gpu, ngpus_per_node, args)
+
 
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
@@ -111,11 +114,27 @@ def main_worker(gpu, ngpus_per_node, args):
     # Optimizer / criterion(wSDR)
     criterion = wSDR
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_mult=1, T_0=5)
 
     # Resume
     if args.resume:
-        model.load_state_dict(torch.load(args.resume, map_location="cuda:0"))
+        if os.path.isfile(args.resume):
+            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.gpu is None:
+                checkpoint = torch.load(args.resume)
+            else:
+                # Map model to be loaded to specified single gpu.
+                loc = 'cuda:{}'.format(args.gpu)
+                checkpoint = torch.load(args.resume, map_location=loc)
+
+            args.start_epoch = checkpoint['epoch']
+            model.load_state_dict(checkpoint['model'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+
+        else:
+            print("=> no checkpoint found at '{}'".format(args.resume))
 
         # 만약 Dataparallel 으로 저장했을 시 이 코드 사용
         # stat_dict = torch.load(args.resume, map_location="cuda:0")
@@ -186,9 +205,14 @@ def main_worker(gpu, ngpus_per_node, args):
             loss=loss, PESQ=PESQ
         ))
 
-        if best_PESQ < PESQ: # 현재 PESQ 더 클시
+        if best_PESQ < PESQ:  # 현재 PESQ 더 클시
             print("Found better validated model")
-            torch.save(model.state_dict(), "saved_models/model_%d.pth" % (epoch + 1))
+            torch.save({
+                'epoch': epoch + 1,
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict()
+            }, "saved_models/checkpoint_%d.pth" % (epoch + 1))
+
             best_PESQ = PESQ
 
 
@@ -212,11 +236,17 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         optimizer.step()
 
         if i % args.print_freq == 0:
+            print(get_lr(optimizer))
             print(" Epoch [%d][%d/%d] | loss: %f" % (epoch+1, i, len(train_loader), loss))
 
     scheduler.step()
     elapse = datetime.timedelta(seconds=time.time() - end)
     print(f"걸린 시간: ", elapse)
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
 
 
 def validate(dataloader, model, criterion, n_fft, hop_length, args):

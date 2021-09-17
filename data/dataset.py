@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa
+import random
 
 import torch
 import torchaudio
@@ -9,6 +10,7 @@ import torchaudio.functional as F
 from torch.utils.data import Dataset
 
 from data.STFT import STFT
+from data.conv_stft import *
 
 class SpeechDataset(Dataset):
 
@@ -19,9 +21,9 @@ class SpeechDataset(Dataset):
         self.hop_length = hop_length
 
         # STFT
-        self.stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True)
+        # self.stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True)
         # default 로 window 는 hanning 이고 length 는 n_fft와 동일하게
-
+        # self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True)
         # list of files
         self.noisy_files = sorted(noisy_files)
         self.clean_files = sorted(clean_files)
@@ -54,9 +56,9 @@ class SpeechDataset(Dataset):
         return output
 
     def __getitem__(self, idx):
+        x_noisy = self.load_sample(self.noisy_files[idx])
         x_clean = self.load_sample(self.clean_files[idx])
         # x_clean = self.load_sample("test/10_GT.wav")
-        x_noisy = self.load_sample(self.noisy_files[idx])
         # x_noisy = self.load_sample("test/10.wav")
 
         # print(self.clean_files[idx], x_clean.size())
@@ -77,25 +79,30 @@ class SpeechDataset(Dataset):
         # print(x_noisy.size())
 
         # STFT
-        x_noisy_stft = self.stft(x_noisy)
-        x_clean_stft = self.stft(x_clean)
-        # print("target: ", x_clean_stft)
-        # print("noisy: ", x_noisy_stft)
+        # x_noisy_stft = self.stft(x_noisy)
+        # x_clean_stft = self.stft(x_clean)
+        #
+        # real, imag = torch.chunk(x_noisy_stft, 2, dim=1)
+        # noisy_stft = torch.stack([real, imag], dim=-1)
+        #
+        # x_real, x_imag = torch.chunk(x_clean_stft, 2, dim=1)
+        # clean_stft = torch.stack([x_real, x_imag], dim=-1)
+        # print(clean_stft.size())
 
-        real = x_noisy_stft[:, :, :, 0]
-        real_gt = x_clean_stft[:, :, :, 0]
-        imag = x_noisy_stft[:, :, :, 1]
-        imag_gt = x_clean_stft[:, :, :, 1]
+        # real = x_noisy_stft[:, :, :, 0]
+        # real_gt = x_clean_stft[:, :, :, 0]
+        # imag = x_noisy_stft[:, :, :, 1]
+        # imag_gt = x_clean_stft[:, :, :, 1]
         # print(real.size())
-        real_db = librosa.amplitude_to_db(real)
-        real_gt_db = librosa.amplitude_to_db(real_gt)
-        #display_spectrogram(real_db, "Real")
-        #display_spectrogram(real_gt_db, "Real_GT")
+        # real_db = librosa.amplitude_to_db(x_real)
+        # real_gt_db = librosa.amplitude_to_db(x_clean_stft)
+        # display_spectrogram(x_real, "Real")
+        # display_spectrogram(real_gt_db, "Real_GT")
 
-        imag_db = librosa.amplitude_to_db(imag)
-        imag_gt_db = librosa.amplitude_to_db(imag_gt)
+        # imag_db = librosa.amplitude_to_db(imag)
+        # imag_gt_db = librosa.amplitude_to_db(imag_gt)
         #display_spectrogram(imag_db, "imag")
-        #display_spectrogram(imag_gt_db, "imag_GT")
+        # display_spectrogram(imag_gt_db, "imag_GT")
 
 
         """
@@ -103,22 +110,22 @@ class SpeechDataset(Dataset):
         비교적 transform은 비슷하게? 찍힘
         librosa 사용예정
         """
-        mag = torch.abs(torch.sqrt(real**2+imag**2))
-        mag_gt = torch.abs(torch.sqrt(real_gt**2+imag_gt**2))
+        # mag = torch.abs(torch.sqrt(real**2+imag**2))
+        # mag_gt = torch.abs(torch.sqrt(real_gt**2+imag_gt**2))
         # transform = torchaudio.transforms.AmplitudeToDB()
         # mag_db = transform(mag)
 
-        mag_db = librosa.amplitude_to_db(mag)
-        mag_gt_db = librosa.amplitude_to_db(mag_gt)
+        # mag_db = librosa.amplitude_to_db(mag)
+        # mag_gt_db = librosa.amplitude_to_db(mag_gt)
         #display_spectrogram(mag_db, "mag")
         #display_spectrogram(mag_gt_db, "mag_GT")
 
-        phase = torch.atan2(imag, real)
-        phase_gt = torch.atan2(imag_gt, real_gt)
-        phase_db = librosa.amplitude_to_db(phase)
-        phase_gt_db = librosa.amplitude_to_db(phase_gt)
-        #display_spectrogram(phase_db, "phase")
-        #display_spectrogram(phase_gt_db, "phase_GT")
+        # phase = torch.atan2(imag, real)
+        # phase_gt = torch.atan2(imag_gt, real_gt)
+        # phase_db = librosa.amplitude_to_db(phase)
+        # phase_gt_db = librosa.amplitude_to_db(phase_gt)
+        # display_spectrogram(phase_db, "phase")
+        # display_spectrogram(phase_gt_db, "phase_GT")
 
         # transform = torchaudio.transforms.AmplitudeToDB()
         # phase_db = transform(phase)
@@ -126,7 +133,7 @@ class SpeechDataset(Dataset):
         # print("A: ", x_noisy_stft.size())
         # print("B: ", x_clean_stft.size())
 
-        return x_noisy_stft, x_clean_stft
+        return x_noisy, x_clean
 
 
 def display_spectrogram(x, title):

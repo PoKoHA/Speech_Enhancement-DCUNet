@@ -2,6 +2,10 @@
 
 ~~- 코드의 수정이 필요함~~(2021/08/06 수정완료)~~
 
+**Update**
+- (2021/09/17) Conv_STFT 쓰니까 PESQ도 0.1좀넘게 상승하고, 빠르게 Inference됨
+
+
 - Result folder에 Spectrogram 비교 첨부 
 
 > 이때까지는 STFT 후 spectrogram으로 Magnitude만 뽑아서 사용하였지만 본 논문에서는 Phase와 Magnitude를 함께 사용하여

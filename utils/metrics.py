@@ -10,7 +10,7 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
     model.eval()
     test_pesq = 0.
     total_loss = 0
-    istft = ISTFT(hop_length=HOP_LENGTH, n_fft=N_FFT).cuda(args.gpu)
+    # istft = ISTFT(hop_length=HOP_LENGTH, n_fft=N_FFT).cuda(args.gpu)
     with torch.no_grad():
         total_nan = 0
         for i, (mixed, target) in tqdm(enumerate(dataloader)):
@@ -20,12 +20,11 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
             # test loss 구하기WW
             pred_x = model(mixed) # time domain
             loss = criterion(args, N_FFT, HOP_LENGTH, mixed, pred_x, target)
-            # print(pred_x)
             total_loss += loss.item()
 
             # PESQ score 구하기
-            target = istft(target)
-            target = torch.squeeze(target, 1) # [batch, 1539, 214, 2]
+            # target = istft(target)
+            # target = torch.squeeze(target, 1) # [batch, 1539, 214, 2]
 
             psq = 0.
             nan = 0
