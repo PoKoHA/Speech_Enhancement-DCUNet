@@ -175,9 +175,9 @@ class DCUNet16(nn.Module):
         self.args = args
         self.n_fft = n_fft
         self.hop_length = hop_length
-        # self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft)
-        self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
-        self.istft = ConviSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
+        self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft)
+        # self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
+        # self.istft = ConviSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
 
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
@@ -190,27 +190,29 @@ class DCUNet16(nn.Module):
         self.downsample7 = EncoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
 
         # Decoder(Upsampling)
-        self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64, out_channels=64)
-        self.upsample1 = DecoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=128, out_channels=64)
-        self.upsample2 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=128, out_channels=64)
-        self.upsample3 = DecoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=128, out_channels=64, output_padding=(0, 1))
-        self.upsample4 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=128, out_channels=64)
-        self.upsample5 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=128, out_channels=32)
-        self.upsample6 = DecoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=64, out_channels=32)
+        self.upsample0 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=64,
+                                      out_channels=64)
+        self.upsample1 = DecoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=128,
+                                      out_channels=64)
+        self.upsample2 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=128,
+                                      out_channels=64)
+        self.upsample3 = DecoderBlock(kernel_size=(5, 3), stride=(2, 2), padding=(2, 1), in_channels=128,
+                                      out_channels=64, output_padding=(0, 1))
+        self.upsample4 = DecoderBlock(kernel_size=(5, 3), stride=(2, 1), padding=(2, 1), in_channels=128,
+                                      out_channels=64)
+        self.upsample5 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=128,
+                                      out_channels=32)
+        self.upsample6 = DecoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=64,
+                                      out_channels=32, output_padding=(1, 0))
         self.upsample7 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=64, out_channels=1,
-                                      bias=True, last=True)
+                                      output_padding=(0, 1), bias=True, last=True)
 
 
     def forward(self, x, is_istft=True):
         # print("input:", x.size())
 
-        x_noisy_stft = self.stft(x).unsqueeze(1)
-        # print("____", x_noisy_stft.size())
-        real, imag = torch.chunk(x_noisy_stft, 2, dim=2)
-        stft = torch.stack([real, imag], dim=-1)
-
-        real = stft[..., 0]
-        imag = stft[..., 1]
+        real = x[..., 0]
+        imag = x[..., 1]
         spec_mag = torch.sqrt(real ** 2 + imag ** 2 + 1e-8)
         spec_phase = torch.atan2(imag, real)
         # downsampling/encoding
@@ -218,7 +220,7 @@ class DCUNet16(nn.Module):
         # print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
-        d0 = self.downsample0(stft)
+        d0 = self.downsample0(x)
         # display_feature(d0[..., 0], "Encoder_1_real")
         # display_feature(d0[..., 1], "Encoder_1_imag")
         # print("   d0: ", d0.size())
@@ -294,8 +296,9 @@ class DCUNet16(nn.Module):
         u5 = self.upsample5(c4)
         # display_feature(u5[..., 0], "Decoder_6_real")
         # display_feature(u5[..., 1], "Decoder_6_imag")
-        c5 = torch.cat((u5, d1), dim=1)
         # print("   u5: ", u5.size())
+        # print(d1.size())
+        c5 = torch.cat((u5, d1), dim=1)
         # print("   concat(u5,d1): ", c5.size())
 
         u6 = self.upsample6(c5)
@@ -320,7 +323,7 @@ class DCUNet16(nn.Module):
         est_real = est_mag * torch.cos(est_phase)
         est_imag = est_mag * torch.sin(est_phase)
         # [1, 512, 1653]
-        output = torch.cat([est_real, est_imag], dim=2).squeeze(1)
+        output = torch.stack([est_real, est_imag], dim=-1)
         # output = x * u7
 
         # print("x", x)
@@ -343,6 +346,7 @@ class DCUNet16(nn.Module):
         if is_istft:
             # output = torch.squeeze(output, 1)
             # output = torch.istft(output, n_fft=self.n_fft, hop_length=self.hop_length, normalized=True)
+            # print(output.size())
             output = self.istft(output)
             # print("   istft: ", output.size())
             output = torch.squeeze(output, 1)
