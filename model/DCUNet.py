@@ -270,6 +270,7 @@ class DCUNet16(nn.Module):
             rr = spec[..., 0]
             ii = spec[..., 1]
             est = torch.cat([rr, ii], dim=2).squeeze(1)
+            print(est.size())
             output = self.istft(est)
             output = torch.clamp_(output, -1, 1)
 
@@ -284,6 +285,6 @@ def display_spectrogram(x, title):
     plt.show()
 
 if __name__ == "__main__":
-    a = torch.randn(2, 1, 257, 1653, 2)
+    a = torch.randn(2, 1, 165000)
     b = DCUNet16(args="aa")
-    print(b(a).size())
+    print(b(a)[0].size())
