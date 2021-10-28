@@ -21,8 +21,8 @@ class SpeechDataset(Dataset):
         self.hop_length = hop_length
 
         # STFT
-        # self.stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True)
-        self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True)
+        self.stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True)
+        # self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True)
 
         # default 로 window 는 hanning 이고 length 는 n_fft와 동일하게
         # self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True)
@@ -84,8 +84,8 @@ class SpeechDataset(Dataset):
         # x_noisy_stft = self.stft(x_noisy)
         # x_clean_stft = self.stft(x_clean)
 
-        # noisy_stft = self.stft(x_noisy)
-        # clean_stft = self.stft(x_clean)
+        noisy_stft = self.stft(x_noisy)
+        clean_stft = self.stft(x_clean)
         # # print(noisy_stft.size())
         # real = noisy_stft[:, :257]
         # imag = noisy_stft[:, 257:]
@@ -139,7 +139,7 @@ class SpeechDataset(Dataset):
         # print("A: ", x_noisy_stft.size())
         # print("B: ", x_clean_stft.size())
 
-        return x_noisy, x_clean
+        return noisy_stft, clean_stft
 
 
 def display_spectrogram(x, title):

@@ -169,7 +169,8 @@ def main_worker(gpu, ngpus_per_node, args):
         model = torch.nn.DataParallel(model).cuda()
 
     # Optimizer / criterion(wSDR)
-    criterion = SISNRLoss().cuda(args.gpu)
+    # criterion = SISNRLoss().cuda(args.gpu)
+    criterion = wSDR
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
@@ -298,11 +299,11 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         mixed = mixed.cuda(args.gpu, non_blocking=True) # noisy
         target = target.cuda(args.gpu, non_blocking=True) # Clean
 
-        wav, spec = model(mixed) # denoisy
+        wav = model(mixed) # denoisy
         # print("mixed", mixed.size())
         # print("pred", pred.size())
         # print("target", target.size())
-        loss = criterion(wav, target)
+        loss = criterion(args, n_fft, hop_length, mixed, wav, target)
 
         optimizer.zero_grad()
         loss.backward()

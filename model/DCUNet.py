@@ -6,13 +6,15 @@ W ∗h = (A ∗ x − B ∗ y) + i(B ∗ x+ A ∗ y)
 """
 import matplotlib.pyplot as plt
 import librosa
+import scipy.signal
 
 import torch
 import torch.nn as nn
 
 from model.complex_nn import CConv2d, CConvTranspose2d, CBatchNorm2d
 from model.ISTFT import ISTFT
-from data.conv_stft import *
+from data.STFT import STFT
+# from data.conv_stft import *
 
 from utils.utils import display_feature
 
@@ -104,8 +106,8 @@ class DCUNet16(nn.Module):
         self.args = args
         self.n_fft = n_fft
         self.hop_length = hop_length
-        self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True)
-        self.istft = ConviSTFT(400, 100, 512, 'hanning', 'complex', fix=True)
+        # self.stft = STFT(fft_length=n_fft, hop_length=hop_length, normalized=True)
+        self.istft = ISTFT(n_fft=n_fft, hop_length=hop_length)
         # self.stft = ConvSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
         # self.istft = ConviSTFT(400, 100, 512, 'hanning', 'complex', fix=True).cuda(args.gpu)
 
@@ -133,29 +135,27 @@ class DCUNet16(nn.Module):
         self.upsample5 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=128,
                                       out_channels=32)
         self.upsample6 = DecoderBlock(kernel_size=(7, 5), stride=(2, 1), padding=(3, 2), in_channels=64,
-                                      out_channels=32)
+                                      out_channels=32, output_padding=(1, 0))
         self.upsample7 = DecoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=64, out_channels=1,
-                                      bias=True, last=True)
+                                      bias=True, last=True, output_padding=(0, 1))
 
-
-    def forward(self, x, is_istft=True):
+    def forward(self, input, is_istft=True):
         # print("input:", x.size())
-        noisy_stft = self.stft(x)
         # print(noisy_stft.size())
-        real = noisy_stft[:, :257]
-        imag = noisy_stft[:, 257:]
-        inputs = torch.stack([real, imag], dim=-1).unsqueeze(1)
-
-        spec_mag = torch.sqrt(real ** 2 + imag ** 2 + 1e-8).unsqueeze(1)
+        real = input[..., 0]
+        imag = input[..., 1]
+        # inputs = torch.stack([real, imag], dim=-1).unsqueeze(1)
+        #
+        spec_mag = torch.sqrt(real ** 2 + imag ** 2 + 1e-8)
+        spec_phase = torch.atan2(imag, real)
         # print("spec", spec_mag.size())
-        spec_phase = torch.atan2(imag, real).unsqueeze(1)
-        inp = inputs
+        # inp = inputs
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
-        d0 = self.downsample0(inp)
+        d0 = self.downsample0(input)
         # display_feature(d0[..., 0], "Encoder_1_real")
         # display_feature(d0[..., 1], "Encoder_1_imag")
         # print("   d0: ", d0.size())
@@ -249,6 +249,7 @@ class DCUNet16(nn.Module):
 
         # mask_mag, mask_phase = self.upsample7(c6)
         mask = self.upsample7(c6)
+        # print(mask.size())
 
         mask_real = mask[..., 0]
         mask_imag = mask[..., 1]
@@ -258,23 +259,18 @@ class DCUNet16(nn.Module):
 
         mask_phase = torch.atan2(imag_phase, real_phase)
         mask_mag = torch.tanh(mask_mag)
-
         est_mag = mask_mag * spec_mag  # magnitude mask 입히고
         est_phase = spec_phase + mask_phase  # todo phase 더하나?
 
         real = est_mag * torch.cos(est_phase)  # todo 이 공식 좀더 자세히 본 기억있음
         imag = est_mag * torch.sin(est_phase)
         spec = torch.stack([real, imag], dim=-1)
-
         if is_istft:
-            rr = spec[..., 0]
-            ii = spec[..., 1]
-            est = torch.cat([rr, ii], dim=2).squeeze(1)
-            print(est.size())
-            output = self.istft(est)
+            # print(est.size())
+            output = self.istft(spec)
             output = torch.clamp_(output, -1, 1)
 
-        return output, spec
+        return output
 
 
 def display_spectrogram(x, title):
@@ -284,7 +280,9 @@ def display_spectrogram(x, title):
     plt.title(title)
     plt.show()
 
+
 if __name__ == "__main__":
-    a = torch.randn(2, 1, 165000)
-    b = DCUNet16(args="aa")
-    print(b(a)[0].size())
+    a = torch.randn(2, 1, 1539, 214 ,2)
+
+    b = DCUNet16(args="aa", n_fft=3076, hop_length=772)
+    print(b(a).size())
