@@ -6,11 +6,12 @@ import torchaudio
 from pypesq import pesq
 from model.ISTFT import ISTFT
 
-def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
+
+def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH, summary, epoch):
     model.eval()
     test_pesq = 0.
     total_loss = 0
-    istft = ISTFT(hop_length=HOP_LENGTH, n_fft=N_FFT).cuda(args.gpu)
+    # istft = ISTFT(hop_length=HOP_LENGTH, n_fft=N_FFT).cuda(args.gpu)
     with torch.no_grad():
         total_nan = 0
         for i, (mixed, target) in tqdm(enumerate(dataloader)):
@@ -18,20 +19,22 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
             target = target.cuda(args.gpu)
 
             # test loss 구하기WW
-            pred_x = model(mixed) # time domain
-            loss = criterion(args, N_FFT, HOP_LENGTH, mixed, pred_x, target)
-            total_loss += loss.item()
-
+            pred = model(mixed) # time domain
+            loss = criterion(pred, target)
+            # total_loss += loss.item()
+            niter = epoch * len(dataloader) + i
+            summary.add_scalar('Valid/loss', loss.item(), niter)
             # PESQ score 구하기
-            target = istft(target)
+            # target = istft(target)
             target = torch.squeeze(target, 1) # [batch, 1539, 214, 2]
+            pred = torch.squeeze(pred, 1) # [batch, 1539, 214, 2]
 
             psq = 0.
             nan = 0
 
             for idx in range(len(target)):
                 clean_x_16 = torchaudio.transforms.Resample(48000, 16000).cuda(args.gpu)(target[idx, :].view(1, -1))
-                pred_x_16 = torchaudio.transforms.Resample(48000, 16000).cuda(args.gpu)(pred_x[idx, :].view(1, -1))
+                pred_x_16 = torchaudio.transforms.Resample(48000, 16000).cuda(args.gpu)(pred[idx, :].view(1, -1))
 
                 clean_x_16 = clean_x_16.cpu().numpy()
                 pred_x_16 = pred_x_16.detach().cpu().numpy()
@@ -57,5 +60,5 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH):
         # print(len(dataloader) - total_nan)
         test_pesq /= (len(dataloader) - total_nan)
         loss_avg = total_loss / len(dataloader)
-
+        summary.add_scalar('Valid/pesq', test_pesq, epoch)
     return test_pesq, loss_avg
