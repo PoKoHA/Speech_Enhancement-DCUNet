@@ -154,7 +154,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # ourselves based on the total number of GPUs we have
             args.batch_size = int(args.batch_size / ngpus_per_node)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
 
         else:
             model.cuda()
@@ -283,7 +283,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 torch.save({
                     'epoch': epoch + 1,
                     'PESQ': best_PESQ,
-                    'model': model.module.state_dict(),
+                    'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                 }, "saved_models/checkpoint_%d.pth" % (epoch + 1))
             best_PESQ = PESQ
@@ -298,11 +298,11 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, n_fft, ho
         mixed = mixed.cuda(args.gpu, non_blocking=True) # noisy
         target = target.cuda(args.gpu, non_blocking=True) # Clean
 
-        pred = model(mixed) # denoisy
+        wav, spec = model(mixed) # denoisy
         # print("mixed", mixed.size())
         # print("pred", pred.size())
         # print("target", target.size())
-        loss = criterion(pred, target)
+        loss = criterion(wav, target)
 
         optimizer.zero_grad()
         loss.backward()

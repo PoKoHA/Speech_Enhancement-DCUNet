@@ -55,7 +55,6 @@ class DecoderBlock(nn.Module):
         # Paper) last_decoder_layer 에서는 BN과 Activation 을 사용하지 않음
         if self.last:
             output = Trans_cConv
-            return output
             # mask_real = Trans_cConv[..., 0]
             # mask_imag = Trans_cConv[..., 1]
             #
@@ -94,7 +93,7 @@ class DecoderBlock(nn.Module):
             normed = self.cBN(Trans_cConv)
             output = self.leaky_relu(normed)
 
-            return output
+        return output
 
 class DCUNet16(nn.Module):
 
@@ -150,12 +149,13 @@ class DCUNet16(nn.Module):
         spec_mag = torch.sqrt(real ** 2 + imag ** 2 + 1e-8).unsqueeze(1)
         # print("spec", spec_mag.size())
         spec_phase = torch.atan2(imag, real).unsqueeze(1)
+        inp = inputs
         # downsampling/encoding
         # print("   --[Encoder]-- ")
         # print("       Input(spec): ", x.size())
         # display_feature(x[..., 0], "input_real")
         # display_feature(x[..., 1], "input_imag")
-        d0 = self.downsample0(inputs)
+        d0 = self.downsample0(inp)
         # display_feature(d0[..., 0], "Encoder_1_real")
         # display_feature(d0[..., 1], "Encoder_1_imag")
         # print("   d0: ", d0.size())
@@ -249,6 +249,7 @@ class DCUNet16(nn.Module):
 
         # mask_mag, mask_phase = self.upsample7(c6)
         mask = self.upsample7(c6)
+
         mask_real = mask[..., 0]
         mask_imag = mask[..., 1]
         mask_mag = (mask_real ** 2 + mask_imag ** 2) ** 0.5
@@ -263,16 +264,16 @@ class DCUNet16(nn.Module):
 
         real = est_mag * torch.cos(est_phase)  # todo 이 공식 좀더 자세히 본 기억있음
         imag = est_mag * torch.sin(est_phase)
-        output = torch.stack([real, imag], dim=-1)
+        spec = torch.stack([real, imag], dim=-1)
 
         if is_istft:
-            rr = output[..., 0]
-            ii = output[..., 1]
+            rr = spec[..., 0]
+            ii = spec[..., 1]
             est = torch.cat([rr, ii], dim=2).squeeze(1)
             output = self.istft(est)
             output = torch.clamp_(output, -1, 1)
 
-        return output
+        return output, spec
 
 
 def display_spectrogram(x, title):

@@ -77,8 +77,5 @@ class SISNRLoss(nn.Module):
     def forward(self, s1, s2):
         # s1: estimated time domain waveform( mask 입혀진 waveform )
         # s2: clean time domain waveform( Ground Truth 느낌 )
-        s2 = torch.squeeze(s2, 1)
-        # print(s2.size())
-        # print("A",s1.size())
         return -(si_snr(s1, s2, eps=self.eps))
 

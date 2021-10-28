@@ -19,7 +19,7 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH, summary, e
             target = target.cuda(args.gpu)
 
             # test loss 구하기WW
-            pred = model(mixed) # time domain
+            pred, sepc = model(mixed) # time domain
             loss = criterion(pred, target)
             # total_loss += loss.item()
             niter = epoch * len(dataloader) + i
@@ -61,4 +61,4 @@ def pesq_score(model, dataloader, criterion, args, N_FFT, HOP_LENGTH, summary, e
         test_pesq /= (len(dataloader) - total_nan)
         loss_avg = total_loss / len(dataloader)
         summary.add_scalar('Valid/pesq', test_pesq, epoch)
-    return test_pesq, loss_avg
+    return test_pesq
