@@ -1,17 +1,13 @@
-(2021-09-01) ~~ASR Transformer  오류 수정~~
+(2022.06.07) - 코드에 Error가 있음 차후 수정
+(2021.09.01) ~~ASR Transformer  오류 수정~~
 
-(2021-09-07) Freq and Temporal CBAM 추가
+(2021.09.07) - Freq and Temporal CBAM 추가
 
-**Final Branch**
-
+**This**
 - Encoder와 Decoder Skip Connection에 **CBAM**을 적용
 - **ASR Transformer**에 사용하였던 ScheduleAdam을 사용
-- Self Attention 적용한 **Discriminator** 적용
-- Loss를 wSDR이 아닌 **SI-SNR**로 바꿈(DCCRN꺼 그대로)
-
-- 수정: Inference할 때는 DCUnet(Upsampling7)을 걸치고 나온 Mask에 Input을 곱해준 Denoising Output(즉, attention을
-적용 하지 않은 Output)을 Decoder Input으로 할 예정
-
+- Self Attention 적용한 **Discriminator(SAGAN)** 적용
+- Loss를 wSDR이 아닌 **SI-SNR**로 변경
 
 
 ## Architecture
@@ -70,19 +66,4 @@ Code: https://github.com/sweetcocoa/DeepComplexUNetPyTorch/tree/c68510a4d822f19f
 
 > `python main.py --gpu(or MultiGPU) --batch-size ** --warm-steps (batch에 따라 유연성있게) --epochs 40
 > --decay_epoch 20``
-
-## Result
-
-- **(Base DCUnet)PESQ: 3.1231 기록**
-
-| Mix | predict | GT |
-|---|---|---|
-| [mixture.wav](./example/mixed.wav?raw=true) |  [predict.wav](./example/predict.wav?raw=true)  |  [GT.wav](./example/GT.wav?raw=true)  |
-
-**- todo 업데이트 예정**
-- **(ours Model)PESQ: 약 3.3**~~(GPU고장으로 학습 중단하고 뽑은 Score)~~
-
-| Mix | predict | GT |
-|---|---|---|
-| [mixture.wav]|  [predict.wav]|  [GT.wav] |
 
