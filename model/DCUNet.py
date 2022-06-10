@@ -170,8 +170,8 @@ class DCUNet16(nn.Module):
         self.hop_length = hop_length
         self.istft = ISTFT(hop_length=hop_length, n_fft=n_fft).cuda(args.gpu)
 
-        self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
-        self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
+        # self.real_transformer = SpeechTransformer(args=args).cuda(args.gpu)
+        # self.imag_transformer = SpeechTransformer(args=args).cuda(args.gpu)
 
         # Encoder(downsampling)
         self.downsample0 = EncoderBlock(kernel_size=(7, 5), stride=(2, 2), padding=(3, 2), in_channels=1, out_channels=32)
@@ -325,11 +325,14 @@ class DCUNet16(nn.Module):
         target_imag = target[..., 1]
 
         # print("input", real.size())
-        real_attn = self.real_transformer(real, target_real)
-        imag_attn = self.imag_transformer(imag, target_imag)
+        # real_attn = self.real_transformer(real, target_real)
+        # imag_attn = self.imag_transformer(imag, target_imag)
+        """
+        Target없이 Inference할 때 문제가 있어 제거 ==> 추후 SelfAttention으로 변경
+        """
 
         # print("real", real_attn.size())
-        mask = torch.stack([real_attn, imag_attn], dim=-1)
+        mask = torch.stack([real, imag], dim=-1)
         mask = torch.unsqueeze(mask, dim=1)
         # print(mask.size())
         # print("mask", mask.size())
